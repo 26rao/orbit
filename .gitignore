@@ -43,6 +43,17 @@ htmlcov/
 *.sqlite
 *.sqlite3
 
+# Node & Expo
+node_modules/
+.expo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+temp/
+/tmp/
+
 # OS generated
 .DS_Store
 Thumbs.db
