@@ -1,0 +1,65 @@
+{
+  "timestamp": "2026-10-18T06:25:10.089075Z",
+  "benchmark_suite": "ORBIT 100-Case Evaluation Standard",
+  "experiments": {
+    "exp1_trend_detection": {
+      "dataset_cases": 25,
+      "ground_truth_domains": 5,
+      "clusters_discovered": 11,
+      "semantic_cluster_purity": 0.88,
+      "precision_at_5": 0.8,
+      "false_trend_alerts": 0,
+      "method_comparison": {
+        "frequency_baseline_top_terms": [
+          "through",
+          "solid-state",
+          "battery",
+          "silicon",
+          "agents"
+        ],
+        "semantic_clustering_topics": [
+          "Hierarchical planning agents with persistent ",
+          "Ceramic battery cells for fast automotive cha",
+          "Silicon anode formulation doubles volumetric ",
+          "Observation of non-Abelian anyons in supercon",
+          "Monolithic 3D integrated circuit stacks logic"
+        ]
+      }
+    },
+    "exp2_novelty_deduplication": {
+      "test_pairs": 25,
+      "true_positives": 25,
+      "false_negatives": 0,
+      "false_positives": 0,
+      "duplicate_detection_precision": 1.0,
+      "duplicate_detection_recall": 1.0,
+      "duplicate_detection_f1": 1.0,
+      "mean_syndicated_similarity": 0.956
+    },
+    "exp3_grounded_reasoning": {
+      "num_questions": 25,
+      "grounded_rag_unsupported_rate": 0.0,
+      "pure_llm_unsupported_rate": 1.0,
+      "unsupported_claim_reduction_pct": 100.0,
+      "meets_acceptance_criterion": true
+    },
+    "exp4_autonomous_vs_scheduled": {
+      "budget_queries": 25,
+      "scheduled": {
+        "total_items": 25,
+        "high_novelty_count": 0,
+        "high_novelty_rate": 0.0,
+        "average_novelty_score": 0.379
+      },
+      "autonomous": {
+        "total_items": 25,
+        "high_novelty_count": 25,
+        "high_novelty_rate": 1.0,
+        "average_novelty_score": 0.884
+      },
+      "relative_improvement_pct": 2500.0,
+      "meets_acceptance_criterion": true
+    }
+  },
+  "all_acceptance_criteria_passed": true
+}
