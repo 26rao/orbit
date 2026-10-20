@@ -12,14 +12,16 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app.core.config import APP_TITLE, APP_VERSION, HELPLINE_NUMBER, CYBERCRIME_PORTAL
+from app.core.config import APP_TITLE, APP_VERSION, HELPLINE_NUMBER, CYBERCRIME_PORTAL, BANK_FREEZE_DIRECTORY
 from app.core.rules import IMPOSSIBLE_LEGAL_PROCEDURES, URGENCY_PATTERNS
 from app.engines.classifier import classify_payload
 from app.engines.legal_engine import verify_legal_document
 from app.engines.payment_engine import verify_payment_data
 from app.engines.text_engine import verify_text_and_links
+from app.engines.audio_engine import verify_audio_deepfake
 from app.services.tts_service import generate_voice_explanation
 from app.services.dossier import build_cybercrime_dossier
+from app.services.pdf_service import generate_dossier_pdf
 
 app = FastAPI(
     title=APP_TITLE,
@@ -41,7 +43,7 @@ class VerificationResponse(BaseModel):
     confidence: float = Field(..., description="Epistemic confidence level (0.0 to 1.0)")
     summary: str = Field(..., description="Plain-language forensic verdict summary")
     reasons: List[str] = Field(..., description="Explanatory forensic findings")
-    input_modality: str = Field(..., description="DOCUMENT | PAYMENT | MESSAGE_LINK_APK")
+    input_modality: str = Field(..., description="DOCUMENT | PAYMENT | MESSAGE_LINK_APK | AUDIO_VOICE")
     audio_base64: Optional[str] = Field(None, description="Base64-encoded MP3 voice warning")
     dossier: Optional[Dict[str, Any]] = Field(None, description="Pre-filled 1930 / cybercrime.gov.in complaint dossier")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
@@ -69,6 +71,8 @@ async def process_verification(
         result = await verify_legal_document(file_path=temp_path, text_content=text_content)
     elif input_type == "PAYMENT":
         result = await verify_payment_data(file_path=temp_path, text_data=text_content)
+    elif input_type == "AUDIO_VOICE":
+        result = await verify_audio_deepfake(file_path=temp_path, text_content=text_content)
     else:  # MESSAGE, LINK, OR APK
         result = await verify_text_and_links(text_content=text_content, file_path=temp_path)
 
@@ -183,7 +187,39 @@ async def health_check():
         "version": APP_VERSION,
         "helpline": HELPLINE_NUMBER,
         "portal": CYBERCRIME_PORTAL,
-        "pipelines": ["LEGAL_DOCUMENT", "PAYMENT_INTENT_QR", "MESSAGE_PHISHING_APK"]
+        "pipelines": [
+            "LEGAL_DOCUMENT",
+            "PAYMENT_INTENT_QR",
+            "MESSAGE_PHISHING_APK",
+            "AUDIO_VOICE_DEEPFAKE",
+            "SEBI_TASK_SCAM"
+        ]
+    }
+
+
+@app.post("/api/v1/dossier/pdf")
+async def generate_dossier_pdf_endpoint(dossier: Dict[str, Any]):
+    """Generate Section 63 BSA / 65B compliant electronic evidence PDF."""
+    try:
+        pdf_bytes = generate_dossier_pdf(dossier)
+        dossier_id = dossier.get("dossier_id", "INCIDENT")
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="KavachAI_Dossier_{dossier_id}.pdf"'}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+
+@app.get("/api/v1/freeze-guide")
+async def freeze_guide_endpoint():
+    """Golden Hour 1-Click Bank Account Freeze Guide."""
+    return {
+        "helpline": HELPLINE_NUMBER,
+        "emergency_dial": "tel:1930",
+        "golden_hour_window": "First 60-120 minutes post transaction",
+        "banks": BANK_FREEZE_DIRECTORY
     }
 
 
@@ -762,22 +798,29 @@ INDEX_HTML = """<!DOCTYPE html>
             <div class="shield-icon">🛡️</div>
             <h1>KAVACH<span>AI</span></h1>
         </a>
-        <div class="badge-1930">
-            <span class="pulse-dot"></span>
-            National Cyber Helpline 1930 Active
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <button type="button" class="btn-dossier" style="border-color: #ef4444; color: #fca5a5; font-size: 13px; padding: 6px 14px; border-radius: 20px;" onclick="openFreezeModal()">
+                ⚡ Golden Hour Bank Freeze
+            </button>
+            <div class="badge-1930">
+                <span class="pulse-dot"></span>
+                National Cyber Helpline 1930
+            </div>
         </div>
     </header>
 
     <main class="container">
         <section class="hero">
-            <h2>Instant Scam Forensic Verification</h2>
-            <p>Drop a court notice, police summons, QR code, UPI handle, electricity SMS, or APK file. Receive statutory legal validation and evidence-backed fraud verdicts in seconds.</p>
+            <h2>Universal Scam & Legal Fraud Forensics</h2>
+            <p>Upload a court notice, police summons, QR code, UPI handle, SMS, .APK file, or voice clip. Receive epistemic legal validation, VirusTotal threat intelligence, and court-admissible Section 63 BSA dossiers.</p>
 
             <div class="preset-bar">
                 <div class="preset-chip" onclick="loadSample('digital_arrest')">⚖️ Test "Digital Arrest" Notice</div>
                 <div class="preset-chip" onclick="loadSample('power_cut')">⚡ Test Electricity Power-Cut SMS</div>
-                <div class="preset-chip" onclick="loadSample('upi_refund')">💸 Test UPI Refund QR / Intent Inversion</div>
-                <div class="preset-chip" onclick="loadSample('sim_block')">📱 Test SIM Block Phishing</div>
+                <div class="preset-chip" onclick="loadSample('sebi_stock')">📈 Test Fake SEBI VIP Trading Group</div>
+                <div class="preset-chip" onclick="loadSample('task_scam')">💼 Test YouTube / Review Task Scam</div>
+                <div class="preset-chip" onclick="loadSample('deepfake_audio')">🎙️ Test Deepfake Audio / Bail Extortion</div>
+                <div class="preset-chip" onclick="loadSample('upi_refund')">💸 Test UPI Refund QR / Inversion</div>
             </div>
         </section>
 
@@ -787,19 +830,19 @@ INDEX_HTML = """<!DOCTYPE html>
                     <span>Message Text, Payment Link, or UPI URI</span>
                     <span id="charCount">0 chars</span>
                 </div>
-                <textarea id="textContent" placeholder="Paste suspicious SMS, WhatsApp message, UPI ID (e.g. cybercrime-police@okhdfcbank), or payment link here..."></textarea>
+                <textarea id="textContent" placeholder="Paste suspicious SMS, WhatsApp message, Telegram stock tip, UPI ID, or context here..."></textarea>
             </div>
 
             <div class="input-group">
                 <div class="input-label">
-                    <span>Upload Artifact (Image, PDF, QR Code, or APK)</span>
+                    <span>Upload Artifact (Image, PDF, QR Code, APK, or Audio Voicemail)</span>
                 </div>
                 <div class="dropzone" id="dropzone">
-                    <input type="file" id="fileInput" style="display: none;" accept="image/*,.pdf,.apk">
+                    <input type="file" id="fileInput" style="display: none;" accept="image/*,.pdf,.apk,audio/*,.mp3,.wav,.m4a">
                     <div class="dropzone-content">
                         <div class="dropzone-icon">📥</div>
                         <div class="dropzone-title">Click to upload or drag & drop artifact</div>
-                        <div class="dropzone-sub">Supports Fake Court Summons (PDF/JPG), UPI QR codes, or Suspicious .APK files</div>
+                        <div class="dropzone-sub">Supports Court Notices (PDF/JPG), UPI QR codes, .APK files, or Audio Voicemails (.WAV/.MP3)</div>
                     </div>
                 </div>
                 <div class="file-preview" id="filePreview">
@@ -809,10 +852,14 @@ INDEX_HTML = """<!DOCTYPE html>
             </div>
 
             <div class="controls-row">
-                <div class="lang-toggle">
+                <div class="lang-toggle" style="flex-wrap: wrap;">
                     <span>Voice Memo Language:</span>
-                    <button type="button" class="lang-btn active" id="btnHi" onclick="setLang('hi')">हिंदी (Hindi)</button>
+                    <button type="button" class="lang-btn active" id="btnHi" onclick="setLang('hi')">हिंदी</button>
                     <button type="button" class="lang-btn" id="btnEn" onclick="setLang('en')">English</button>
+                    <button type="button" class="lang-btn" id="btnTe" onclick="setLang('te')">తెలుగు</button>
+                    <button type="button" class="lang-btn" id="btnKn" onclick="setLang('kn')">ಕನ್ನಡ</button>
+                    <button type="button" class="lang-btn" id="btnTa" onclick="setLang('ta')">தமிழ்</button>
+                    <button type="button" class="lang-btn" id="btnMr" onclick="setLang('mr')">मराठी</button>
                 </div>
 
                 <button class="verify-btn" id="verifyBtn" onclick="runVerification()">
@@ -827,13 +874,13 @@ INDEX_HTML = """<!DOCTYPE html>
             <div class="verdict-header">
                 <div class="verdict-title-box">
                     <h3 id="verdictHeading">🚨 DANGEROUS SCAM DETECTED</h3>
-                    <div style="font-size: 14px; color: var(--text-muted); margin-top: 4px;" id="modalityLabel">Modality: Legal Document</div>
+                    <div style="font-size: 14px; color: var(--text-muted); margin-top: 4px;" id="modalityLabel">Pipeline: Legal Document</div>
                 </div>
                 <div class="verdict-score" id="confidenceBadge">Confidence: 99%</div>
             </div>
 
             <div class="verdict-summary" id="verdictSummary">
-                This document is a criminal forgery. Indian statutory law does not recognize "Digital Arrest" or Skype court depositions.
+                Forensic analysis complete.
             </div>
 
             <div class="reasons-title">Forensic Evidence & Statues Triggered</div>
@@ -844,8 +891,8 @@ INDEX_HTML = """<!DOCTYPE html>
             <div class="action-grid">
                 <div class="action-card">
                     <div>
-                        <h4>🔊 Audio Voice Memo</h4>
-                        <p>15-second plain-language audio advisory for senior citizens or urgent family warning.</p>
+                        <h4>🔊 Regional Audio Warning</h4>
+                        <p>Instant localized voice memo reassuring victims that police never arrest citizens via video calls.</p>
                     </div>
                     <button class="btn-audio" id="playAudioBtn" onclick="playVoiceWarning()">
                         <span>▶</span> Play Voice Warning
@@ -854,18 +901,38 @@ INDEX_HTML = """<!DOCTYPE html>
 
                 <div class="action-card">
                     <div>
+                        <h4>📄 Section 63 BSA PDF Export</h4>
+                        <p>Court-admissible electronic evidence PDF with cryptographic SHA-256 seal for local police cells.</p>
+                    </div>
+                    <button class="btn-audio" style="background: #059669;" id="downloadPdfBtn" onclick="downloadPdfDossier()">
+                        ⬇ Download Official PDF
+                    </button>
+                </div>
+
+                <div class="action-card">
+                    <div>
                         <h4>📋 1930 Cybercrime Dossier</h4>
-                        <p>Pre-filled incident complaint with BNS & IT Act legal sections ready for cybercrime.gov.in.</p>
+                        <p>Pre-filled incident complaint citing BNS & IT Act sections ready for cybercrime.gov.in.</p>
                     </div>
                     <button class="btn-dossier" onclick="openDossierModal()">
-                        View Formal Report
+                        View Formal Text
+                    </button>
+                </div>
+
+                <div class="action-card">
+                    <div>
+                        <h4>⚡ Golden Hour Bank Freeze</h4>
+                        <p>1-Click hotline numbers and SMS shortcodes to freeze bank accounts within the critical first 2 hours.</p>
+                    </div>
+                    <button class="btn-dossier" style="border-color: #ef4444; color: #fca5a5;" onclick="openFreezeModal()">
+                        Emergency Bank Freeze
                     </button>
                 </div>
             </div>
         </section>
 
         <footer class="footer">
-            KavachAI Forensic Engine · Compliant with Bharatiya Nyaya Sanhita (BNS) & IT Act, 2000 · Emergency Helpline 1930
+            KavachAI Forensic Engine · Compliant with Bharatiya Sakshya Adhiniyam (BSA) 2023, BNS, & IT Act 2000 · Emergency Helpline 1930
         </footer>
     </main>
 
@@ -877,12 +944,96 @@ INDEX_HTML = """<!DOCTYPE html>
                 <button class="modal-close" onclick="closeDossierModal()">&times;</button>
             </div>
             <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 14px;">
-                Copy this pre-formatted complaint directly into <a href="https://cybercrime.gov.in" target="_blank" style="color: #3b82f6;">cybercrime.gov.in</a> or dictate it when calling 1930.
+                Copy this pre-formatted complaint directly into <a href="https://cybercrime.gov.in" target="_blank" style="color: #3b82f6;">cybercrime.gov.in</a> or download the court-admissible Section 63 BSA PDF.
             </p>
             <div class="dossier-box" id="dossierTextContent"></div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="btn-dossier" onclick="copyDossier()">📋 Copy Incident FIR</button>
-                <button class="btn-audio" onclick="closeDossierModal()">Done</button>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-audio" style="background: #059669;" onclick="downloadPdfDossier()">📄 Download Section 63 PDF</button>
+                <button class="btn-dossier" onclick="copyDossier()">📋 Copy FIR Narrative</button>
+                <button class="btn-audio" onclick="closeDossierModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Golden Hour Bank Freeze Modal -->
+    <div class="modal-overlay" id="freezeModal">
+        <div class="modal-content" style="max-width: 820px;">
+            <div class="modal-header">
+                <h3 style="color: #ef4444;">🚨 "Golden Hour" 1-Click Bank Account Freeze Guide</h3>
+                <button class="modal-close" onclick="closeFreezeModal()">&times;</button>
+            </div>
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;">
+                <b style="color: #fca5a5;">CRITICAL GOLDEN HOUR NOTICE:</b>
+                <p style="font-size: 13px; color: #f87171; margin-top: 4px;">
+                    In financial cyber fraud, the first 60 to 120 minutes are critical. Once money enters a mule account, funds are rapidly layered. Immediately dial <b>1930</b> or execute the instant SMS freeze commands below.
+                </p>
+                <div style="margin-top: 10px;">
+                    <a href="tel:1930" class="btn-audio" style="background: #dc2626; display: inline-flex; text-decoration: none;">
+                        📞 Auto-Dial 1930 National Cyber Helpline
+                    </a>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 15px; margin-bottom: 8px;">Major Bank Instant Freeze Hotlines & SMS Triggers</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                        <thead>
+                            <tr style="background: #162035; color: #94a3b8; border-bottom: 1px solid var(--border);">
+                                <th style="padding: 8px;">Bank</th>
+                                <th style="padding: 8px;">Helpline</th>
+                                <th style="padding: 8px;">Instant Card Block SMS</th>
+                                <th style="padding: 8px;">UPI Deactivate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bankTableBody">
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>SBI</b></td>
+                                <td style="padding: 8px;"><a href="tel:1800111109" style="color: #3b82f6;">1800 11 1109</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>567676</b></td>
+                                <td style="padding: 8px;">SMS <code>STOPUPI</code> to <b>9223008333</b></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>HDFC Bank</b></td>
+                                <td style="padding: 8px;"><a href="tel:18001600" style="color: #3b82f6;">1800 1600</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>5676712</b></td>
+                                <td style="padding: 8px;">Call 1800 1600 (Option 1)</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>ICICI Bank</b></td>
+                                <td style="padding: 8px;"><a href="tel:18001080" style="color: #3b82f6;">1800 1080</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>5676766</b></td>
+                                <td style="padding: 8px;">SMS <code>SUSPEND</code> to <b>9215676766</b></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>Axis Bank</b></td>
+                                <td style="padding: 8px;"><a href="tel:18604195555" style="color: #3b82f6;">1860 419 5555</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>5676782</b></td>
+                                <td style="padding: 8px;">Call 1860 419 5555</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>PNB</b></td>
+                                <td style="padding: 8px;"><a href="tel:18001802222" style="color: #3b82f6;">1800 180 2222</a></td>
+                                <td style="padding: 8px;">SMS <code>HOT &lt;CardNo&gt;</code> to <b>5607040</b></td>
+                                <td style="padding: 8px;">Call 1800 180 2222</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="background: #090d16; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                <h4 style="font-size: 13px; color: #94a3b8; margin-bottom: 8px;">Pre-Filled Bank Dispute Message Generator</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="freezeUtr" placeholder="Bank Transaction UTR / Ref No." style="background: #162035; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 13px;">
+                    <input type="text" id="freezeSuspectVpa" placeholder="Suspect Beneficiary VPA (e.g. fraud@upi)" style="background: #162035; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 13px;">
+                </div>
+                <button class="btn-dossier" onclick="generateBankDisputeText()">Generate Bank Email / Dispute Text</button>
+                <textarea id="freezeDisputeOutput" readonly style="width: 100%; margin-top: 10px; min-height: 80px; font-size: 12px; font-family: monospace;"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end;">
+                <button class="btn-audio" onclick="closeFreezeModal()">Close Guide</button>
             </div>
         </div>
     </div>
@@ -938,8 +1089,10 @@ INDEX_HTML = """<!DOCTYPE html>
 
         function setLang(lang) {
             preferredLang = lang;
-            document.getElementById('btnHi').classList.toggle('active', lang === 'hi');
-            document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+            ['hi', 'en', 'te', 'kn', 'ta', 'mr'].forEach(l => {
+                const btn = document.getElementById(`btn${l.charAt(0).toUpperCase() + l.slice(1)}`);
+                if (btn) btn.classList.toggle('active', l === lang);
+            });
         }
 
         function loadSample(type) {
@@ -948,10 +1101,14 @@ INDEX_HTML = """<!DOCTYPE html>
                 textContent.value = "SUPREME COURT OF INDIA / CBI HEADQUARTERS NOTICE: You are placed under 24-hour Digital Arrest for illegal money laundering. Do not leave your room. Join Skype video interrogation at 10 AM. Transfer security clearance deposit of Rs 1,50,000 to RBI Clearance Escrow: rbi-escrow@okhdfcbank.";
             } else if (type === 'power_cut') {
                 textContent.value = "Dear Consumer, your electricity power will be disconnected tonight at 09:30 PM because your previous month bill was not updated. Immediately contact our electricity officer Mr. Sharma at 9876543210 or install our quick bill app from http://bijli-bill-update.online/app.apk";
+            } else if (type === 'sebi_stock') {
+                textContent.value = "SEBI REGISTERED INSTITUTIONAL VIP TRADING POOL (Registration No: INZ000293412). Exclusive upper-circuit institutional allocation! Guaranteed 250% weekly profit with insider stock tips. Admin Contact: +84 987654321 (Vietnam Desk). Deposit minimum Rs 50,000 to participate.";
+            } else if (type === 'task_scam') {
+                textContent.value = "Part-time Work From Home Job! Like 3 YouTube videos and earn Rs 150 immediately. Complete Google Maps rating tasks to earn daily income Rs 5,000 to Rs 8,000. Join Telegram VIP task channel now: http://telegram-task-vip.biz";
+            } else if (type === 'deepfake_audio') {
+                textContent.value = "EMERGENCY AUDIO MEMO: 'Dad, I have had a terrible car accident near the highway. The police have arrested me and are asking for bail money immediately. Please transfer Rs 85,000 to this UPI ID right now or they will lock me up in jail.'";
             } else if (type === 'upi_refund') {
                 textContent.value = "upi://pay?pa=refund-desk@okhdfcbank&pn=ElectricityRefundDesk&am=5000&cu=INR&tn=Click_to_receive_cashback_refund";
-            } else if (type === 'sim_block') {
-                textContent.value = "URGENT: Your mobile SIM card service will be permanently blocked in 2 hours due to unverified KYC. Click http://sim-kyc-verify.xyz/update to verify Aadhaar now or call 9123456789.";
             }
             charCount.textContent = `${textContent.value.length} chars`;
         }
@@ -1012,7 +1169,7 @@ INDEX_HTML = """<!DOCTYPE html>
                 heading.textContent = '✅ AUTHENTIC / LOW RISK';
             }
 
-            document.getElementById('modalityLabel').textContent = `Pipeline: ${data.input_modality.replace('_', ' ')}`;
+            document.getElementById('modalityLabel').textContent = `Pipeline: ${data.input_modality.replace(/_/g, ' ')}`;
             document.getElementById('confidenceBadge').textContent = `Confidence: ${(data.confidence * 100).toFixed(0)}%`;
             document.getElementById('verdictSummary').textContent = data.summary;
 
@@ -1034,6 +1191,11 @@ INDEX_HTML = """<!DOCTYPE html>
             } else {
                 playAudioBtn.style.opacity = '0.5';
                 playAudioBtn.disabled = true;
+            }
+
+            // Auto-populate Freeze VPA if available
+            if (currentDossier && currentDossier.suspect_indicators && currentDossier.suspect_indicators.upi_vpas && currentDossier.suspect_indicators.upi_vpas.length > 0) {
+                document.getElementById('freezeSuspectVpa').value = currentDossier.suspect_indicators.upi_vpas[0];
             }
 
             card.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1074,6 +1236,52 @@ INDEX_HTML = """<!DOCTYPE html>
             navigator.clipboard.writeText(text).then(() => {
                 alert('Copied to clipboard! Ready to paste into 1930 / cybercrime.gov.in portal.');
             });
+        }
+
+        async function downloadPdfDossier() {
+            if (!currentDossier) {
+                alert('Please run forensic verification first to generate a dossier.');
+                return;
+            }
+            try {
+                const resp = await fetch('/api/v1/dossier/pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentDossier)
+                });
+                if (!resp.ok) throw new Error('PDF synthesis failed.');
+                const blob = await resp.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `KavachAI_Dossier_${currentDossier.dossier_id || 'Incident'}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch (err) {
+                alert('Could not download PDF: ' + err.message);
+            }
+        }
+
+        function openFreezeModal() {
+            document.getElementById('freezeModal').style.display = 'flex';
+        }
+
+        function closeFreezeModal() {
+            document.getElementById('freezeModal').style.display = 'none';
+        }
+
+        function generateBankDisputeText() {
+            const utr = document.getElementById('freezeUtr').value.trim() || '[PENDING_UTR]';
+            const suspectVpa = document.getElementById('freezeSuspectVpa').value.trim() || (currentDossier?.suspect_indicators?.upi_vpas?.[0] || '[SUSPECT_VPA]');
+            const output = `URGENT FRAUD DISPUTE & RECALL REQUEST (NCRP / 1930)\n` +
+                           `To: Bank Fraud Risk Desk / Nodal Officer\n` +
+                           `I am reporting an unauthorized / fraudulent transfer executed under active cyber extortion.\n` +
+                           `• Transaction UTR / Ref: ${utr}\n` +
+                           `• Suspect Beneficiary VPA: ${suspectVpa}\n` +
+                           `• Incident ID: ${currentDossier?.dossier_id || 'KAVACH-EMERGENCY'}\n` +
+                           `In accordance with RBI Circular on Customer Protection (Limiting Liability in Unauthorized Electronic Banking Transactions) and NCRP 1930 protocol, please immediately FREEZE the beneficiary account and initiate inter-bank recall.`;
+            document.getElementById('freezeDisputeOutput').value = output;
         }
     </script>
 </body>

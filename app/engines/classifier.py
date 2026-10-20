@@ -55,6 +55,9 @@ def classify_payload(text_content: Optional[str], file_path: Optional[str]) -> s
         if ext == ".apk":
             return "MESSAGE_LINK_APK"
 
+        if ext in [".wav", ".mp3", ".m4a", ".ogg", ".flac", ".aac"]:
+            return "AUDIO_VOICE"
+
         if ext == ".pdf":
             return "DOCUMENT"
 

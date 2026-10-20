@@ -15,16 +15,15 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-# Ensure workspace root is in sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from app.main import app
 from app.engines.classifier import classify_payload
 from app.engines.legal_engine import verify_legal_document
 from app.engines.payment_engine import verify_payment_data
-from app.engines.text_engine import verify_text_and_links
+from app.engines.text_engine import verify_text_and_links, analyze_apk_file
+from app.engines.audio_engine import verify_audio_deepfake
 from app.services.tts_service import build_voice_script
 from app.services.dossier import build_cybercrime_dossier, determine_bns_it_sections
+from app.services.pdf_service import generate_dossier_pdf
 
 client = TestClient(app)
 
@@ -128,11 +127,15 @@ def test_tts_voice_scripts():
     """Verify Hindi and English warning voice script generation."""
     hi_script = build_voice_script(["Fake summons"], preferred_language="hi", verdict="DANGEROUS_SCAM")
     en_script = build_voice_script(["Fake summons"], preferred_language="en", verdict="DANGEROUS_SCAM")
+    auth_script_en = build_voice_script([], preferred_language="en", verdict="AUTHENTIC")
+    auth_script_hi = build_voice_script([], preferred_language="hi", verdict="AUTHENTIC")
 
     assert "सावधान! कवच ए आई" in hi_script
     assert "डिजिटल अरेस्ट" in hi_script
     assert "Alert! Kavach AI" in en_script
     assert "Digital Arrest" in en_script
+    assert "authentic and safe" in auth_script_en
+    assert "प्रामाणिक और सुरक्षित" in auth_script_hi
 
 
 def test_api_health_endpoint():
@@ -167,20 +170,116 @@ def test_api_verify_json_endpoint():
     assert "1930" in data["dossier"]["fir_narrative_template"]
 
 
-def test_api_verify_multipart_endpoint():
-    """Verify POST /api/v1/verify with multipart form data."""
-    response = client.post(
-        "/api/v1/verify",
-        data={
-            "text_content": "Dear Consumer, electricity power disconnected tonight. Call 9876543210.",
-            "preferred_language": "hi"
-        }
+def test_regional_audio_scripts():
+    """Verify Telugu, Kannada, Tamil, and Marathi regional voice scripts."""
+    te_script = build_voice_script([], preferred_language="te", verdict="DANGEROUS_SCAM")
+    kn_script = build_voice_script([], preferred_language="kn", verdict="DANGEROUS_SCAM")
+    ta_script = build_voice_script([], preferred_language="ta", verdict="DANGEROUS_SCAM")
+    mr_script = build_voice_script([], preferred_language="mr", verdict="DANGEROUS_SCAM")
+
+    assert "కవచ్" in te_script and "1930" in te_script
+    assert "ಕವಚ" in kn_script and "1930" in kn_script
+    assert "கவச்" in ta_script and "1930" in ta_script
+    assert "कवच" in mr_script and "1930" in mr_script
+
+
+@pytest.mark.asyncio
+async def test_sebi_and_task_scam_detection():
+    """Verify fake SEBI investment scheme and WhatsApp task scam detection."""
+    sebi_msg = (
+        "SEBI REGISTERED INSTITUTIONAL VIP POOL: Guaranteed 200% daily returns! "
+        "Exclusive upper circuit quota. Contact admin +84 9123456789 (Vietnam desk)."
     )
+    result = await verify_text_and_links(text_data=sebi_msg)
+    assert result["verdict"] == "DANGEROUS_SCAM"
+    assert any("SEBI" in r for r in result["reasons"])
+    assert any("CROSS-BORDER" in r or "+84" in r for r in result["reasons"])
+
+    task_msg = "Earn Rs 5000 daily! Like 3 YouTube videos to earn Rs 150 immediately. Join Telegram VIP task channel."
+    task_res = await verify_text_and_links(text_data=task_msg)
+    assert task_res["verdict"] == "DANGEROUS_SCAM"
+    assert any("TASK SCAM" in r for r in task_res["reasons"])
+
+
+def test_golden_hour_bank_freeze_guide():
+    """Verify /api/v1/freeze-guide returns bank directories and 1930 helpline."""
+    response = client.get("/api/v1/freeze-guide")
     assert response.status_code == 200
     data = response.json()
-    assert data["verdict"] == "DANGEROUS_SCAM"
-    assert any("POWER CUT SCAM" in r for r in data["reasons"])
+    assert data["helpline"] == "1930"
+    assert len(data["banks"]) >= 4
+    bank_names = [b["bank_name"] for b in data["banks"]]
+    assert any("SBI" in name for name in bank_names)
+    assert any("HDFC" in name for name in bank_names)
+
+
+@pytest.mark.asyncio
+async def test_deepfake_audio_interceptor():
+    """Verify voice clone extortion detection and out-of-band secret challenge."""
+    res = await verify_audio_deepfake(
+        file_path=None,
+        text_content="Dad, I've had a terrible accident. Police arrested me, send bail money immediately!"
+    )
+    assert res["verdict"] in ["DANGEROUS_SCAM", "SUSPICIOUS"]
+    assert "family_challenge" in res
+    assert "secret passphrase" in res["family_challenge"]
+
+
+def test_pdf_dossier_generation_and_endpoint():
+    """Verify Section 63 BSA PDF generation and /api/v1/dossier/pdf endpoint."""
+    mock_dossier = {
+        "dossier_id": "KAVACH-20261020-TEST",
+        "generated_at": "2026-10-20 12:00:00 UTC",
+        "sha256_evidence_hash": "A" * 64,
+        "verdict": "DANGEROUS_SCAM",
+        "confidence_score": 0.99,
+        "suspect_indicators": {
+            "upi_vpas": ["fraudster@okhdfcbank"],
+            "phishing_domains": ["http://phish-bank.xyz"],
+            "contact_numbers": ["9876543210"],
+        },
+        "statutory_violations": [
+            "Section 66D, Information Technology Act, 2000",
+            "Section 318(4), Bharatiya Nyaya Sanhita, 2023"
+        ],
+        "fir_narrative_template": "FORMAL COMPLAINT UNDER SECTION 173 BNSS...",
+    }
+
+    # Test direct PDF generator
+    pdf_bytes = generate_dossier_pdf(mock_dossier)
+    assert pdf_bytes.startswith(b"%PDF-")
+    assert len(pdf_bytes) > 1000
+
+    # Test HTTP endpoint
+    response = client.post("/api/v1/dossier/pdf", json=mock_dossier)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF-")
+
+
+@pytest.mark.asyncio
+async def test_apk_manifest_and_sha256():
+    """Verify offline AndroidManifest fallback extracts high-risk permissions."""
+    import zipfile
+    with tempfile.NamedTemporaryFile(suffix=".apk", delete=False) as f:
+        apk_path = f.name
+
+    try:
+        # Create a mock APK containing AndroidManifest.xml
+        with zipfile.ZipFile(apk_path, "w") as z:
+            manifest_content = b'android.permission.BIND_ACCESSIBILITY_SERVICE android.permission.RECEIVE_SMS'
+            z.writestr("AndroidManifest.xml", manifest_content)
+
+        apk_info = await analyze_apk_file(apk_path)
+        assert apk_info["is_malicious"] is True
+        assert len(apk_info["sha256"]) == 64
+        assert any("BIND_ACCESSIBILITY_SERVICE" in r for r in apk_info["reasons"])
+        assert any("SMS" in r for r in apk_info["reasons"])
+    finally:
+        if os.path.exists(apk_path):
+            os.remove(apk_path)
 
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+

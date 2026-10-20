@@ -29,3 +29,52 @@ TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
 EMERGENCY_CONTACT = os.getenv("EMERGENCY_CONTACT", "")
+
+# VirusTotal API v3 Config (Optional)
+VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY", "")
+
+# Golden Hour Bank Account Freeze Directory
+BANK_FREEZE_DIRECTORY = [
+    {
+        "bank_name": "State Bank of India (SBI)",
+        "helpline": "1800111109 / 18004253800",
+        "card_block_sms": "SMS BLOCK <Last 4 digits> to 567676",
+        "upi_stop_sms": "SMS STOPUPI to 9223008333",
+        "portal_url": "https://www.onlinesbi.sbi",
+    },
+    {
+        "bank_name": "HDFC Bank",
+        "helpline": "18001600 / 18002664060",
+        "card_block_sms": "Call IVR or SMS BLOCK <Last 4 digits> to 5676712",
+        "upi_stop_sms": "Call 18001600 Option 1",
+        "portal_url": "https://netbanking.hdfcbank.com",
+    },
+    {
+        "bank_name": "ICICI Bank",
+        "helpline": "18001080",
+        "card_block_sms": "SMS BLOCK <Last 4 digits> to 5676766",
+        "upi_stop_sms": "SMS SUSPEND to 9215676766",
+        "portal_url": "https://infinity.icicibank.com",
+    },
+    {
+        "bank_name": "Axis Bank",
+        "helpline": "18604195555 / 18605005555",
+        "card_block_sms": "SMS BLOCK <Last 4 digits> to 5676782",
+        "upi_stop_sms": "Call 18604195555",
+        "portal_url": "https://www.axisbank.com",
+    },
+    {
+        "bank_name": "Punjab National Bank (PNB)",
+        "helpline": "18001802222 / 18001032222",
+        "card_block_sms": "SMS HOT <Card Number> to 5607040",
+        "upi_stop_sms": "Call 18001802222",
+        "portal_url": "https://netpnb.com",
+    },
+    {
+        "bank_name": "Canara Bank",
+        "helpline": "18004250018",
+        "card_block_sms": "SMS CANBLOCK <Card Number> to 5607060",
+        "upi_stop_sms": "Call 18004250018",
+        "portal_url": "https://canarabank.com",
+    },
+]

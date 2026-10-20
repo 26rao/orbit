@@ -107,6 +107,26 @@ DANGEROUS_APK_PERMISSIONS = [
     "android.permission.RECORD_AUDIO"
 ]
 
+# High-risk foreign virtual prefixes orchestrating Indian investment/task scams
+HIGH_RISK_ADMIN_PREFIXES = {
+    "+84": "Vietnam (Commonly used in syndicates)",
+    "+855": "Cambodia (Cyber scam enclave hub)",
+    "+234": "Nigeria (Advance fee / romance fraud)",
+    "+92": "Pakistan (Cross-border impersonation)",
+    "+63": "Philippines (Offshore call center fraud)",
+    "+95": "Myanmar (MIA cyber slave camp syndicates)",
+}
+
+# Fake SEBI Investment & Task Scam Signatures
+SEBI_REGISTRATION_REGEX = re.compile(r"\b(IN[A-Z0-9]{8,12}|SEBI/REG/[A-Z0-9]+|INA\d{9}|INZ\d{9}|INH\d{9})\b", re.IGNORECASE)
+
+SEBI_TASK_SCAM_PATTERNS = [
+    r"(?:sebi|institutional\s+account|upper\s+circuit|guaranteed\s+(?:return|profit|100%|200%|daily))",
+    r"(?:pre-ipo\s+allotment|vip\s+stock|insider\s+trading\s+tips|institutional\s+quota)",
+    r"(?:like\s+(?:youtube|instagram|videos)\s+earn|google\s+review\s+task|hotel\s+rating\s+task)",
+    r"(?:part-time\s+task|daily\s+income\s+rs\.\s*[\d,]+|recharge\s+task|vip\s+tier\s+deposit)",
+]
+
 # ---------------------------------------------------------------------------
 # 4. NetworkX Procedural Law Graph Builder
 # ---------------------------------------------------------------------------
