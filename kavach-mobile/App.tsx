@@ -54,6 +54,11 @@ export default function App() {
 
     setLoading(true);
     setResult(null);
+    if (sound) {
+      await sound.unloadAsync();
+      setSound(null);
+      setIsPlayingAudio(false);
+    }
 
     try {
       const formData = new FormData();
@@ -90,28 +95,45 @@ export default function App() {
     }
   };
 
-  const playVoiceExplanation = async () => {
+  // Fixed Play/Pause toggle that reliably pauses and resumes
+  const toggleVoicePlayback = async () => {
     if (!result?.audio_base64) {
-      Alert.alert('Audio Unavailable', 'No voice memo was generated for this finding.');
+      Alert.alert('Audio Unavailable', 'No voice memo is available for this finding.');
       return;
     }
+
     try {
       if (sound) {
-        await sound.unloadAsync();
+        const status = await sound.getStatusAsync();
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            await sound.pauseAsync();
+            setIsPlayingAudio(false);
+            return;
+          } else {
+            await sound.playAsync();
+            setIsPlayingAudio(true);
+            return;
+          }
+        }
       }
+
+      // Create new sound instance
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: `data:audio/mp3;base64,${result.audio_base64}` },
         { shouldPlay: true }
       );
       setSound(newSound);
       setIsPlayingAudio(true);
+
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (!status.isLoaded || status.didJustFinish) {
           setIsPlayingAudio(false);
         }
       });
     } catch (e) {
-      Alert.alert('Audio Playback Error', 'Could not play voice memo.');
+      console.log('Audio error:', e);
+      Alert.alert('Audio Playback', 'Could not toggle voice memo.');
       setIsPlayingAudio(false);
     }
   };
@@ -170,6 +192,12 @@ export default function App() {
 
   const changeLanguage = async (newLang: any) => {
     setPreferredLanguage(newLang);
+    if (sound) {
+      await sound.unloadAsync();
+      setSound(null);
+      setIsPlayingAudio(false);
+    }
+
     if (result) {
       try {
         const resp = await fetch(`${BACKEND_URL}/api/v1/voice-memo`, {
@@ -215,7 +243,7 @@ export default function App() {
   const isScam = result?.verdict === 'DANGEROUS_SCAM';
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#090d16' }}>
+    <View style={{ flex: 1, backgroundColor: '#060911' }}>
       {/* 1. Dynamic Threat Level Banner */}
       {isScam && (
         <View style={styles.topThreatAlert}>
@@ -227,7 +255,7 @@ export default function App() {
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
         <Text style={styles.header}>KAVACH AI</Text>
-        <Text style={styles.subHeader}>Universal Scam & Legal Fraud Verifier</Text>
+        <Text style={styles.subHeader}>National Cybercrime Forensics & Legal Defense Console</Text>
 
         {/* 1. TOP ANCHORED EMERGENCY FREEZE BANNER BUTTON */}
         <TouchableOpacity style={styles.emergencyBanner} onPress={() => setShowFreezeModal(true)}>
@@ -323,6 +351,29 @@ export default function App() {
             </View>
           )}
 
+          {/* Pre-Verification Language Selector */}
+          <Text style={styles.langHeader}>Voice Memo Language:</Text>
+          <View style={styles.langRow}>
+            {[
+              { code: 'hi', label: 'हिंदी' },
+              { code: 'en', label: 'English' },
+              { code: 'kn', label: 'ಕನ್ನಡ' },
+              { code: 'te', label: 'తెలుగు' },
+              { code: 'ta', label: 'தமிழ்' },
+              { code: 'mr', label: 'मराठी' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.code}
+                style={[styles.langChip, preferredLanguage === item.code && styles.langChipActive]}
+                onPress={() => changeLanguage(item.code as any)}
+              >
+                <Text style={[styles.langText, preferredLanguage === item.code && styles.langTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <TouchableOpacity style={styles.verifyButton} onPress={handleVerify} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.verifyText}>VERIFY NOW</Text>}
           </TouchableOpacity>
@@ -368,10 +419,12 @@ export default function App() {
               </Text>
             </View>
 
-            {/* 4. WhatsApp-Style Voice Note Widget */}
+            {/* 4. WhatsApp-Style Voice Note Widget with pause toggle */}
             <View style={styles.voiceNotePlayer}>
-              <TouchableOpacity style={styles.voicePlayBtn} onPress={playVoiceExplanation}>
-                <Text style={{ color: '#fff', fontSize: 16 }}>{isPlayingAudio ? '❚❚' : '▶'}</Text>
+              <TouchableOpacity style={styles.voicePlayBtn} onPress={toggleVoicePlayback}>
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>
+                  {isPlayingAudio ? '❚❚' : '▶'}
+                </Text>
               </TouchableOpacity>
               <View style={styles.waveformRow}>
                 {[10, 16, 22, 12, 18, 24, 14, 20, 12, 16, 24, 18, 12].map((h, i) => (
@@ -379,7 +432,7 @@ export default function App() {
                     key={i}
                     style={[
                       styles.waveformBar,
-                      { height: isPlayingAudio ? (i % 2 === 0 ? 22 : 12) : h },
+                      { height: isPlayingAudio ? (i % 2 === 0 ? 22 : 10) : h },
                     ]}
                   />
                 ))}
@@ -393,8 +446,8 @@ export default function App() {
                 { code: 'hi', label: 'हिन्दी' },
                 { code: 'en', label: 'EN' },
                 { code: 'kn', label: 'ಕನ್ನಡ' },
-                { code: 'ta', label: 'தமிழ்' },
                 { code: 'te', label: 'తెలుగు' },
+                { code: 'ta', label: 'தமிழ்' },
                 { code: 'mr', label: 'मराठी' },
               ].map((item) => (
                 <TouchableOpacity
@@ -559,7 +612,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090d16', padding: 18 },
+  container: { flex: 1, backgroundColor: '#060911', padding: 18 },
   topThreatAlert: {
     backgroundColor: '#b91c1c',
     paddingVertical: 10,
@@ -568,8 +621,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   topThreatAlertText: { color: '#ffffff', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
-  header: { fontSize: 28, fontWeight: '900', color: '#60a5fa', textAlign: 'center', marginTop: 15 },
-  subHeader: { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginBottom: 18 },
+  header: { fontSize: 26, fontWeight: '900', color: '#60a5fa', textAlign: 'center', marginTop: 15 },
+  subHeader: { fontSize: 12.5, color: '#94a3b8', textAlign: 'center', marginBottom: 18 },
   emergencyBanner: {
     backgroundColor: 'rgba(239, 68, 68, 0.12)',
     borderColor: 'rgba(239, 68, 68, 0.55)',
@@ -582,53 +635,59 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
   },
-  emergencyBannerText: { color: '#fca5a5', fontWeight: '700', fontSize: 13.5 },
+  emergencyBannerText: { color: '#fca5a5', fontWeight: '700', fontSize: 13 },
   modeTabBar: {
     flexDirection: 'row',
-    backgroundColor: '#101626',
+    backgroundColor: '#101828',
     borderRadius: 10,
     padding: 4,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#23314f',
+    borderColor: '#1e2e4a',
   },
   modeTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  modeTabActive: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#3b82f6' },
-  modeTabText: { color: '#94a3b8', fontSize: 12.5, fontWeight: '600' },
+  modeTabActive: { backgroundColor: '#16233b', borderWidth: 1, borderColor: '#3b82f6' },
+  modeTabText: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   modeTabTextActive: { color: '#ffffff', fontWeight: '700' },
-  card: { backgroundColor: '#101626', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#23314f' },
+  card: { backgroundColor: '#101828', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#1e2e4a' },
   textInput: {
-    backgroundColor: '#090d16',
+    backgroundColor: '#060911',
     color: '#f8fafc',
     borderRadius: 8,
     padding: 12,
     textAlignVertical: 'top',
     minHeight: 85,
     borderWidth: 1,
-    borderColor: '#23314f',
+    borderColor: '#1e2e4a',
     fontSize: 14,
   },
   dropzoneCard: {
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: '#23314f',
-    backgroundColor: 'rgba(9, 13, 22, 0.5)',
+    borderColor: '#1e2e4a',
+    backgroundColor: 'rgba(6, 9, 17, 0.5)',
     borderRadius: 10,
     padding: 20,
     alignItems: 'center',
   },
-  mediaButton: { backgroundColor: '#1e293b', padding: 10, borderRadius: 8, alignItems: 'center' },
+  mediaButton: { backgroundColor: '#16233b', padding: 10, borderRadius: 8, alignItems: 'center' },
   mediaButtonText: { color: '#60a5fa', fontWeight: '600', fontSize: 13 },
-  verifyButton: { backgroundColor: '#ef4444', padding: 14, borderRadius: 10, marginTop: 14, alignItems: 'center' },
+  langHeader: { color: '#94a3b8', fontSize: 12, fontWeight: '700', marginTop: 14, marginBottom: 6 },
+  langRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
+  langChip: { paddingVertical: 5, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#16233b', borderWidth: 1, borderColor: '#1e2e4a' },
+  langChipActive: { backgroundColor: '#2563eb', borderColor: '#3b82f6' },
+  langText: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
+  langTextActive: { color: '#ffffff' },
+  verifyButton: { backgroundColor: '#ef4444', padding: 13, borderRadius: 10, marginTop: 14, alignItems: 'center' },
   verifyText: { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 0.5 },
   resultCard: { marginTop: 22, padding: 18, borderRadius: 14 },
-  danger: { backgroundColor: 'rgba(60, 10, 15, 0.95)', borderColor: '#ef4444', borderWidth: 1.5 },
-  warning: { backgroundColor: 'rgba(58, 39, 7, 0.95)', borderColor: '#f59e0b', borderWidth: 1.5 },
-  authentic: { backgroundColor: 'rgba(10, 45, 25, 0.95)', borderColor: '#10b981', borderWidth: 1.5 },
+  danger: { backgroundColor: 'rgba(60, 10, 15, 0.96)', borderColor: '#ef4444', borderWidth: 1.5 },
+  warning: { backgroundColor: 'rgba(58, 39, 7, 0.96)', borderColor: '#f59e0b', borderWidth: 1.5 },
+  authentic: { backgroundColor: 'rgba(10, 45, 25, 0.96)', borderColor: '#10b981', borderWidth: 1.5 },
   verdictTitle: { fontSize: 19, fontWeight: '900', marginBottom: 4 },
   confidence: { fontSize: 12.5, color: '#94a3b8', marginBottom: 12 },
   heroTakeaway: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
     borderLeftWidth: 4,
     borderLeftColor: '#ef4444',
     padding: 12,
@@ -638,9 +697,9 @@ const styles = StyleSheet.create({
   heroTakeawayTitle: { color: '#ffffff', fontSize: 15, fontWeight: '800', lineHeight: 20, marginBottom: 4 },
   heroTakeawaySub: { color: '#cbd5e1', fontSize: 13, lineHeight: 18 },
   voiceNotePlayer: {
-    backgroundColor: '#101626',
+    backgroundColor: '#101828',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(59, 130, 246, 0.35)',
     borderRadius: 24,
     paddingVertical: 8,
     paddingHorizontal: 14,
@@ -650,9 +709,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   voicePlayBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#2563eb',
     alignItems: 'center',
     justifyContent: 'center',
@@ -661,13 +720,13 @@ const styles = StyleSheet.create({
   waveformBar: { width: 3, backgroundColor: '#3b82f6', borderRadius: 2 },
   voiceTimer: { color: '#94a3b8', fontSize: 12, fontFamily: 'monospace' },
   langPillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
-  pillBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, backgroundColor: '#1e293b' },
+  pillBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, backgroundColor: '#16233b' },
   pillBtnActive: { backgroundColor: '#2563eb' },
   pillBtnText: { color: '#94a3b8', fontSize: 11.5, fontWeight: '600' },
   pillBtnTextActive: { color: '#fff' },
   breakdownHeader: { color: '#94a3b8', fontSize: 12, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8 },
   accordionHeader: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: 8,
@@ -679,7 +738,7 @@ const styles = StyleSheet.create({
   },
   accordionTitle: { color: '#fff', fontSize: 13, fontWeight: '700' },
   accordionBody: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
     padding: 10,
     borderRadius: 8,
     marginBottom: 8,
@@ -688,14 +747,14 @@ const styles = StyleSheet.create({
   monoText: { color: '#94a3b8', fontFamily: 'monospace', fontSize: 11, lineHeight: 16 },
   pdfButton: { backgroundColor: '#059669', padding: 12, borderRadius: 8, alignItems: 'center' },
   pdfButtonText: { color: '#fff', fontWeight: '700', fontSize: 13.5 },
-  dossierButton: { backgroundColor: '#1e293b', padding: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
+  dossierButton: { backgroundColor: '#16233b', padding: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1e2e4a' },
   dossierButtonText: { color: '#e2e8f0', fontWeight: '700', fontSize: 13.5 },
   bottomSheet: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0c121e',
     borderTopWidth: 2,
     borderTopColor: '#ef4444',
     paddingVertical: 12,
@@ -715,9 +774,9 @@ const styles = StyleSheet.create({
   bottomSheetCallText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   bottomSheetSecBtn: {
     flex: 1,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#16233b',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#1e2e4a',
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',
@@ -725,14 +784,14 @@ const styles = StyleSheet.create({
   },
   bottomSheetSecText: { color: '#f8fafc', fontWeight: '600', fontSize: 12 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 18 },
-  modalContent: { backgroundColor: '#101626', borderRadius: 14, padding: 18, maxHeight: '82%', borderWidth: 1, borderColor: '#23314f' },
+  modalContent: { backgroundColor: '#101828', borderRadius: 14, padding: 18, maxHeight: '82%', borderWidth: 1, borderColor: '#1e2e4a' },
   modalTitle: { fontSize: 17, fontWeight: '800', color: '#60a5fa', marginBottom: 10 },
-  dossierScroll: { maxHeight: 340, backgroundColor: '#090d16', padding: 12, borderRadius: 8 },
+  dossierScroll: { maxHeight: 340, backgroundColor: '#060911', padding: 12, borderRadius: 8 },
   dossierCode: { color: '#cbd5e1', fontFamily: 'monospace', fontSize: 11.5, lineHeight: 16 },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 14, gap: 10 },
   shareButton: { backgroundColor: '#059669', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 6 },
   shareText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  closeButton: { backgroundColor: '#1e293b', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 6 },
+  closeButton: { backgroundColor: '#16233b', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 6 },
   closeText: { color: '#cbd5e1', fontWeight: '700', fontSize: 13 },
   freezeDesc: { color: '#cbd5e1', fontSize: 13, lineHeight: 18, marginBottom: 12 },
   dialBtn: { backgroundColor: '#dc2626', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
