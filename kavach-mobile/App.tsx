@@ -141,6 +141,29 @@ export default function App() {
     }
   };
 
+  const changeLanguage = async (newLang: any) => {
+    setPreferredLanguage(newLang);
+    if (result) {
+      try {
+        const resp = await fetch(`${BACKEND_URL}/api/v1/voice-memo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reasons: result.reasons || [],
+            preferred_language: newLang,
+            verdict: result.verdict || 'DANGEROUS_SCAM',
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          setResult({ ...result, audio_base64: data.audio_base64 });
+        }
+      } catch (e) {
+        console.log('Language audio update error:', e);
+      }
+    }
+  };
+
   const dial1930 = () => {
     Linking.openURL('tel:1930').catch(() => {
       Alert.alert('Helpline', 'Dial 1930 directly on your phone dialer.');
@@ -189,7 +212,7 @@ export default function App() {
             <TouchableOpacity
               key={item.code}
               style={[styles.langChip, preferredLanguage === item.code && styles.langChipActive]}
-              onPress={() => setPreferredLanguage(item.code as any)}
+              onPress={() => changeLanguage(item.code as any)}
             >
               <Text style={[styles.langText, preferredLanguage === item.code && styles.langTextActive]}>
                 {item.label}

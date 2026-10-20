@@ -212,6 +212,25 @@ async def generate_dossier_pdf_endpoint(dossier: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
 
 
+class VoiceMemoRequest(BaseModel):
+    reasons: List[str] = Field(default_factory=list)
+    preferred_language: str = "hi"
+    verdict: str = "DANGEROUS_SCAM"
+
+
+@app.post("/api/v1/voice-memo")
+async def generate_voice_memo_endpoint(req: VoiceMemoRequest):
+    """Generate audio memo on-the-fly for any regional language (te, kn, ta, mr, hi, en)."""
+    audio_base64 = await generate_voice_explanation(
+        reasons=req.reasons,
+        preferred_language=req.preferred_language,
+        verdict=req.verdict
+    )
+    if not audio_base64:
+        raise HTTPException(status_code=500, detail="Voice synthesis failed.")
+    return {"audio_base64": audio_base64, "language": req.preferred_language}
+
+
 @app.get("/api/v1/freeze-guide")
 async def freeze_guide_endpoint():
     """Golden Hour 1-Click Bank Account Freeze Guide."""
@@ -1087,12 +1106,40 @@ INDEX_HTML = """<!DOCTYPE html>
             filePreview.style.display = 'none';
         }
 
-        function setLang(lang) {
+        let currentResult = null;
+
+        async function setLang(lang) {
             preferredLang = lang;
             ['hi', 'en', 'te', 'kn', 'ta', 'mr'].forEach(l => {
                 const btn = document.getElementById(`btn${l.charAt(0).toUpperCase() + l.slice(1)}`);
                 if (btn) btn.classList.toggle('active', l === lang);
             });
+
+            if (currentResult) {
+                const playAudioBtn = document.getElementById('playAudioBtn');
+                playAudioBtn.disabled = true;
+                playAudioBtn.innerHTML = `<span>⏳</span> Synthesizing ${lang.toUpperCase()} voice...`;
+                try {
+                    const resp = await fetch('/api/v1/voice-memo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            reasons: currentResult.reasons || [],
+                            preferred_language: lang,
+                            verdict: currentResult.verdict || 'DANGEROUS_SCAM'
+                        })
+                    });
+                    if (resp.ok) {
+                        const memoData = await resp.json();
+                        currentAudioBase64 = memoData.audio_base64;
+                    }
+                } catch (e) {
+                    console.log('Voice memo refresh error:', e);
+                } finally {
+                    playAudioBtn.disabled = false;
+                    playAudioBtn.innerHTML = `<span>▶</span> Play Regional Audio (${lang.toUpperCase()})`;
+                }
+            }
         }
 
         function loadSample(type) {
@@ -1181,6 +1228,7 @@ INDEX_HTML = """<!DOCTYPE html>
                 list.appendChild(li);
             });
 
+            currentResult = data;
             currentAudioBase64 = data.audio_base64;
             currentDossier = data.dossier;
 

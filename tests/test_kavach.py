@@ -280,6 +280,24 @@ async def test_apk_manifest_and_sha256():
             os.remove(apk_path)
 
 
+def test_voice_memo_endpoint():
+    """Verify POST /api/v1/voice-memo returns regional audio in requested language."""
+    for lang in ["te", "kn", "ta", "mr", "hi", "en"]:
+        resp = client.post(
+            "/api/v1/voice-memo",
+            json={
+                "reasons": ["Test finding"],
+                "preferred_language": lang,
+                "verdict": "DANGEROUS_SCAM"
+            }
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["language"] == lang
+        assert data["audio_base64"] is not None
+        assert len(data["audio_base64"]) > 500
+
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
 
