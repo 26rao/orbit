@@ -6,6 +6,7 @@ Produces court-admissible electronic incident summaries conforming to:
 """
 
 import io
+import html
 import datetime
 from typing import Dict, Any
 
@@ -28,6 +29,9 @@ def generate_dossier_pdf(dossier: Dict[str, Any]) -> bytes:
     """
     Generate an authoritative, court-ready PDF dossier byte stream.
     """
+    def esc(val: Any) -> str:
+        return html.escape(str(val) if val is not None else "")
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -118,10 +122,10 @@ def generate_dossier_pdf(dossier: Dict[str, Any]) -> bytes:
     elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#0f172a"), spaceAfter=10))
 
     # 2. Metadata Grid
-    dossier_id = dossier.get("dossier_id", "KAVACH-INCIDENT-UNKNOWN")
-    generated_at = dossier.get("generated_at", datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"))
-    sha256_hash = dossier.get("sha256_evidence_hash", "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855")
-    verdict = dossier.get("verdict", "SUSPICIOUS")
+    dossier_id = esc(dossier.get("dossier_id", "KAVACH-INCIDENT-UNKNOWN"))
+    generated_at = esc(dossier.get("generated_at", datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")))
+    sha256_hash = esc(dossier.get("sha256_evidence_hash", "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"))
+    verdict = esc(dossier.get("verdict", "SUSPICIOUS"))
     confidence = int(float(dossier.get("confidence_score", 0.85)) * 100)
 
     verdict_color = (
@@ -169,12 +173,17 @@ def generate_dossier_pdf(dossier: Dict[str, Any]) -> bytes:
     phones = indicators.get("contact_numbers", [])
     cnr = indicators.get("fabricated_cnr")
 
+    vpas_str = esc(", ".join(vpas)) if vpas else "None extracted"
+    domains_str = esc(", ".join(domains)) if domains else "None extracted"
+    phones_str = esc(", ".join(phones)) if phones else "None extracted"
+    cnr_str = esc(cnr) if cnr else "N/A"
+
     ident_rows = []
     ident_rows.append([Paragraph("<b>Indicator Type</b>", meta_style), Paragraph("<b>Extracted Forensic Value</b>", meta_style)])
-    ident_rows.append([Paragraph("Suspect UPI VPA Accounts", meta_style), Paragraph(", ".join(vpas) if vpas else "None extracted", meta_style)])
-    ident_rows.append([Paragraph("Phishing URLs / Domains", meta_style), Paragraph(", ".join(domains) if domains else "None extracted", meta_style)])
-    ident_rows.append([Paragraph("Suspect Contact Number(s)", meta_style), Paragraph(", ".join(phones) if phones else "None extracted", meta_style)])
-    ident_rows.append([Paragraph("Fabricated Court CNR", meta_style), Paragraph(str(cnr) if cnr else "N/A", meta_style)])
+    ident_rows.append([Paragraph("Suspect UPI VPA Accounts", meta_style), Paragraph(vpas_str, meta_style)])
+    ident_rows.append([Paragraph("Phishing URLs / Domains", meta_style), Paragraph(domains_str, meta_style)])
+    ident_rows.append([Paragraph("Suspect Contact Number(s)", meta_style), Paragraph(phones_str, meta_style)])
+    ident_rows.append([Paragraph("Fabricated Court CNR", meta_style), Paragraph(cnr_str, meta_style)])
 
     ident_table = Table(ident_rows, colWidths=[180, 360])
     ident_table.setStyle(
@@ -195,19 +204,14 @@ def generate_dossier_pdf(dossier: Dict[str, Any]) -> bytes:
     # 4. Applicable Statutory Legal Sections
     elements.append(Paragraph("2. STATUTORY OFFENCES & PENAL PROVISIONS", section_heading))
     sections = dossier.get("statutory_violations", dossier.get("applicable_legal_sections", []))
-    sec_text = "<br/>".join([f"• <b>{s}</b>" for s in sections]) if sections else "• Section 66D, Information Technology Act, 2000"
+    sec_text = "<br/>".join([f"• <b>{esc(s)}</b>" for s in sections]) if sections else "• Section 66D, Information Technology Act, 2000"
     elements.append(Paragraph(sec_text, body_style))
     elements.append(Spacer(1, 10))
 
     # 5. Pre-filled FIR Narrative Template
     elements.append(Paragraph("3. COMPLAINT NARRATIVE (FOR POLICE CYBER CELL / NCRP 1930)", section_heading))
     fir_template = dossier.get("fir_narrative_template", dossier.get("fir_narrative", ""))
-    escaped_narrative = (
-        fir_template.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\n", "<br/>")
-    )
+    escaped_narrative = esc(fir_template).replace("\n", "<br/>")
     narrative_table = Table([[Paragraph(escaped_narrative, code_style)]], colWidths=[540])
     narrative_table.setStyle(
         TableStyle(

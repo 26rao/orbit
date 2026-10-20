@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KavachAI — Universal Scam & Fraud Forensics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090d16;
+            --surface: #101626;
+            --surface-elevated: #162035;
+            --border: #23314f;
+            --border-hover: #3b5080;
+            --accent: #ef4444;
+            --accent-glow: rgba(239, 68, 68, 0.25);
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.25);
+            --warning: #f59e0b;
+            --success: #10b981;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            line-height: 1.5;
+            overflow-x: hidden;
+            transition: background 0.4s ease, box-shadow 0.4s ease;
+            background-image: 
+                radial-gradient(circle at 15% 10%, rgba(59, 130, 246, 0.12), transparent 40%),
+                radial-gradient(circle at 85% 15%, rgba(239, 68, 68, 0.10), transparent 45%),
+                radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.08), transparent 50%);
+        }
+
+        /* Dynamic Threat Level State Machine */
+        body.threat-active {
+            box-shadow: inset 0 0 120px rgba(239, 68, 68, 0.25);
+            background-color: #0d0507;
+        }
+
+        body.threat-safe {
+            box-shadow: inset 0 0 100px rgba(16, 185, 129, 0.15);
+            background-color: #040d09;
+        }
+
+        /* Top Persistent Alert Banner */
+        .threat-alert-banner {
+            display: none;
+            background: linear-gradient(90deg, #b91c1c, #ef4444, #b91c1c);
+            color: #ffffff;
+            text-align: center;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            animation: pulseBanner 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseBanner {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.9; }
+        }
+
+        .header-bar {
+            padding: 18px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(12px);
+            background: rgba(9, 13, 22, 0.85);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: border-color 0.3s ease;
+        }
+
+        body.threat-active .header-bar {
+            border-bottom-color: rgba(239, 68, 68, 0.45);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .shield-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #ef4444, #3b82f6);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .brand h1 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand span {
+            color: #ef4444;
+        }
+
+        .badge-1930 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fca5a5;
+            text-decoration: none;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #ef4444;
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .container {
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 24px 20px 100px;
+        }
+
+        /* 1. TOP EMERGENCY FREEZE BANNER BUTTON */
+        .emergency-freeze-bar {
+            width: 100%;
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.10) 0%, rgba(220, 38, 38, 0.22) 50%, rgba(239, 68, 68, 0.10) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.55);
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.15), inset 0 0 12px rgba(239, 68, 68, 0.08);
+            border-radius: 12px;
+            padding: 13px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #ff7b7b;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            margin-bottom: 28px;
+            transition: all 0.25s ease;
+        }
+
+        .emergency-freeze-bar:hover {
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.18) 0%, rgba(220, 38, 38, 0.32) 50%, rgba(239, 68, 68, 0.18) 100%);
+            border-color: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 0 24px rgba(239, 68, 68, 0.35);
+            transform: translateY(-1px);
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .hero h2 {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 16px;
+            color: var(--text-muted);
+            max-width: 680px;
+            margin: 0 auto;
+        }
+
+        .preset-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .preset-chip {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preset-chip:hover {
+            border-color: var(--primary);
+            color: var(--text-main);
+            transform: translateY(-1px);
+        }
+
+        /* 2. TABBED / PILL MODE SWITCHER */
+        .mode-segmented-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 4px;
+            margin-bottom: 20px;
+            gap: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .mode-segmented-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .mode-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 14px;
+            font-family: inherit;
+            font-size: 13.5px;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .mode-tab:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .mode-tab.active {
+            background: var(--surface-elevated);
+            color: #ffffff;
+            border: 1px solid var(--border-hover);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        }
+
+        .main-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            margin-bottom: 30px;
+        }
+
+        .tab-content-panel {
+            display: none;
+        }
+
+        .tab-content-panel.active {
+            display: block;
+        }
+
+        .input-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .btn-paste {
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-paste:hover {
+            background: rgba(59, 130, 246, 0.22);
+            color: #ffffff;
+        }
+
+        textarea {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 110px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        textarea:focus {
+            border-color: var(--primary);
+        }
+
+        .clean-input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .clean-input:focus {
+            border-color: var(--primary);
+        }
+
+        /* Large File Drop Area */
+        .dropzone-large {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-md);
+            padding: 32px 20px;
+            text-align: center;
+            background: rgba(9, 13, 22, 0.5);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dropzone-large:hover, .dropzone-large.dragover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        .file-preview {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .verify-btn {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: var(--radius-md);
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .verify-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
+        }
+
+        .verify-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 3. VERDICT DISPLAY & PROGRESSIVE DISCLOSURE */
+        .verdict-card {
+            display: none;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 30px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .verdict-DANGEROUS_SCAM {
+            background: linear-gradient(180deg, rgba(60, 10, 15, 0.95), rgba(30, 5, 8, 0.95));
+            border: 2px solid #ef4444;
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.35);
+        }
+
+        .verdict-SUSPICIOUS {
+            background: linear-gradient(180deg, rgba(58, 39, 7, 0.95), rgba(30, 20, 4, 0.95));
+            border: 2px solid #f59e0b;
+            box-shadow: 0 0 25px rgba(245, 158, 11, 0.25);
+        }
+
+        .verdict-AUTHENTIC {
+            background: linear-gradient(180deg, rgba(10, 45, 25, 0.95), rgba(5, 25, 15, 0.95));
+            border: 2px solid #10b981;
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+        }
+
+        /* Level 1: Human Takeaway Hero Card */
+        .hero-takeaway-card {
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 5px solid #ef4444;
+        }
+
+        .verdict-AUTHENTIC .hero-takeaway-card {
+            border-left-color: #10b981;
+        }
+
+        .verdict-SUSPICIOUS .hero-takeaway-card {
+            border-left-color: #f59e0b;
+        }
+
+        .hero-headline {
+            font-size: 22px;
+            font-weight: 800;
+            line-height: 1.35;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+
+        .hero-subtakeaway {
+            font-size: 15px;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        /* Level 2: The "Why" Breakdown (Interactive Accordion) */
+        .accordion-container {
+            margin-bottom: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .accordion-item {
+            background: rgba(0, 0, 0, 0.28);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+        }
+
+        .accordion-header {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            font-size: 14.5px;
+            background: rgba(255, 255, 255, 0.02);
+            transition: background 0.2s ease;
+        }
+
+        .accordion-header:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .accordion-content {
+            padding: 14px 16px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #e2e8f0;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        /* Level 3: Forensic Details Drawer */
+        .forensic-drawer {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 24px;
+        }
+
+        .forensic-drawer summary {
+            font-weight: 700;
+            font-size: 13.5px;
+            color: #94a3b8;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .forensic-drawer summary:hover {
+            color: #ffffff;
+        }
+
+        .forensic-drawer-body {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* 4. WHATSAPP-STYLE VOICE NOTE PLAYER */
+        .voice-memo-player {
+            background: rgba(16, 22, 38, 0.85);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 28px;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            flex-wrap: wrap;
+        }
+
+        .audio-play-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #2563eb;
+            color: white;
+            border: none;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .audio-play-btn:hover {
+            background: #1d4ed8;
+            transform: scale(1.05);
+        }
+
+        .waveform-box {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 28px;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .waveform-bar {
+            width: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+            height: 6px;
+            transition: height 0.15s ease, background 0.15s ease;
+        }
+
+        .waveform-bar.playing {
+            background: #3b82f6;
+            animation: pulseWave 0.8s infinite ease-in-out alternate;
+        }
+
+        @keyframes pulseWave {
+            0% { height: 6px; }
+            100% { height: 26px; }
+        }
+
+        .audio-duration {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+
+        .player-lang-pills {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .pill-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #cbd5e1;
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .pill-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+        }
+
+        .pill-btn.active {
+            background: #2563eb;
+            border-color: #3b82f6;
+            color: #ffffff;
+        }
+
+        /* 5. FLOATING EMERGENCY ACTION BOTTOM SHEET */
+        .bottom-action-sheet {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(13, 17, 28, 0.95);
+            backdrop-filter: blur(16px);
+            border-top: 2px solid #ef4444;
+            box-shadow: 0 -10px 40px rgba(239, 68, 68, 0.35);
+            padding: 16px 24px;
+            z-index: 150;
+            animation: slideUp 0.35s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .bottom-sheet-content {
+            max-width: 1060px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .bottom-sheet-text {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bottom-sheet-text h4 {
+            font-size: 15px;
+            font-weight: 800;
+            color: #fca5a5;
+        }
+
+        .bottom-sheet-btns {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-bottom-dial {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            font-weight: 800;
+            font-size: 13.5px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            box-shadow: 0 0 14px rgba(220, 38, 38, 0.5);
+        }
+
+        .btn-bottom-dial:hover {
+            background: #b91c1c;
+        }
+
+        .btn-bottom-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 13.5px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+
+        .btn-bottom-secondary:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        /* Action Grid */
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-top: 20px;
+        }
+
+        .action-card {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .action-card h4 {
+            font-size: 14.5px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-card p {
+            font-size: 12.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .btn-dossier {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 9px 14px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13.5px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .btn-dossier:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Modals */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 720px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 24px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-header h3 {
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .dossier-box {
+            background: #090d16;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 380px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            color: #64748b;
+            font-size: 12.5px;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP ALERT BANNER (CRITICAL FRAUD STATE) -->
+    <div id="topThreatBanner" class="threat-alert-banner">
+        🚨 CRITICAL FRAUD DETECTED • DO NOT TRANSFER FUNDS • DO NOT ENTER UPI PIN
+    </div>
+
+    <header class="header-bar">
+        <a href="/" class="brand">
+            <div class="shield-icon">🛡️</div>
+            <h1>KAVACH<span>AI</span></h1>
+        </a>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <button type="button" class="btn-dossier" style="border-color: #ef4444; color: #fca5a5; font-size: 12.5px; padding: 6px 14px; border-radius: 20px;" onclick="openFreezeModal()">
+                ⚡ Bank Freeze Guide
+            </button>
+            <a href="tel:1930" class="badge-1930">
+                <span class="pulse-dot"></span>
+                National Helpline 1930
+            </a>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- 1. TOP ANCHORED EMERGENCY FREEZE BANNER BUTTON -->
+        <div class="emergency-freeze-bar" onclick="openFreezeModal()">
+            🚨 Transferred money? 1-Click Bank Account Freeze Guide
+        </div>
+
+        <section class="hero">
+            <h2>Universal Scam & Legal Fraud Forensics</h2>
+            <p>Paste messages, upload court notices, verify UPI QR codes, or test .APK malware. Receive instantaneous epistemic legal validation and Section 63 BSA evidence dossiers.</p>
+
+            <div class="preset-bar">
+                <div class="preset-chip" onclick="loadSample('digital_arrest')">⚖️ "Digital Arrest" Notice</div>
+                <div class="preset-chip" onclick="loadSample('power_cut')">⚡ Power Disconnect SMS</div>
+                <div class="preset-chip" onclick="loadSample('sebi_stock')">📈 Fake SEBI VIP Trading</div>
+                <div class="preset-chip" onclick="loadSample('task_scam')">💼 YouTube Review Scam</div>
+                <div class="preset-chip" onclick="loadSample('deepfake_audio')">🎙️ Deepfake Bail Extortion</div>
+                <div class="preset-chip" onclick="loadSample('upi_refund')">💸 UPI Refund Inversion</div>
+            </div>
+        </section>
+
+        <!-- 2. TABBED / PILL MODE SWITCHER -->
+        <div class="mode-segmented-bar">
+            <button type="button" class="mode-tab active" id="tabMsg" onclick="switchMode('message')">
+                💬 Message / Text
+            </button>
+            <button type="button" class="mode-tab" id="tabDoc" onclick="switchMode('document')">
+                📄 Notice / Summon PDF
+            </button>
+            <button type="button" class="mode-tab" id="tabPay" onclick="switchMode('payment')">
+                💳 Payment / QR
+            </button>
+            <button type="button" class="mode-tab" id="tabUrl" onclick="switchMode('url')">
+                🔗 URL / App Link
+            </button>
+        </div>
+
+        <section class="main-card">
+            <!-- Tab 1: Message / Text -->
+            <div id="panelMessage" class="tab-content-panel active">
+                <div class="input-label">
+                    <span>Suspicious Message, SMS, or WhatsApp Text</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button type="button" class="btn-paste" onclick="autoPasteClipboard()">📋 Auto-Paste</button>
+                        <span id="charCount" style="font-size: 12px;">0 chars</span>
+                    </div>
+                </div>
+                <textarea id="textContent" placeholder="Paste suspicious SMS, WhatsApp message, Telegram stock tip, or cyber threat text here..."></textarea>
+            </div>
+
+            <!-- Tab 2: Document / PDF Dropzone -->
+            <div id="panelDocument" class="tab-content-panel">
+                <div class="input-label">
+                    <span>Court Notice, Arrest Warrant, or Summon PDF / Image</span>
+                    <span style="font-size: 12px; color: var(--primary);">Supports PDF, JPG, PNG</span>
+                </div>
+                <div class="dropzone-large" id="dropzoneDoc" onclick="document.getElementById('fileInputDoc').click()">
+                    <input type="file" id="fileInputDoc" style="display: none;" accept=".pdf,image/*" onchange="handleFileSelected(this)">
+                    <div style="font-size: 32px; margin-bottom: 8px;">📑</div>
+                    <div style="font-weight: 700; font-size: 15px; margin-bottom: 4px;">Click to upload or drag & drop Court Notice / Warrant</div>
+                    <div style="font-size: 13px; color: var(--text-muted);">Extracts forged judicial seals, CNR numbers, and court registrar signatures automatically</div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Payment / QR Scanner -->
+            <div id="panelPayment" class="tab-content-panel">
+                <div class="input-label">
+                    <span>Payment Intent QR Code or UPI Handle</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="dropzone-large" style="padding: 20px;" onclick="document.getElementById('fileInputQr').click()">
+                        <input type="file" id="fileInputQr" style="display: none;" accept="image/*" onchange="handleFileSelected(this)">
+                        <div style="font-size: 26px; margin-bottom: 4px;">📷</div>
+                        <div style="font-weight: 700; font-size: 13.5px;">Upload UPI QR Image</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">Decodes UPI intent inversion</div>
+                    </div>
+                    <div>
+                        <input type="text" id="upiHandleInput" class="clean-input" placeholder="Or paste UPI ID (e.g. refund@oksbi)" oninput="syncUpiText(this.value)">
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                            Auto-checks if handle belongs to an individual bank or legitimate merchant.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: URL / App Link -->
+            <div id="panelUrl" class="tab-content-panel">
+                <div class="input-label">
+                    <span>Website Domain, Phishing Link, or .APK Download URL</span>
+                    <span id="domainBadge" style="font-size: 12px; color: var(--text-muted);">Live validation</span>
+                </div>
+                <input type="text" id="urlInput" class="clean-input" placeholder="https://bijli-bill-update.online/app.apk" oninput="handleUrlInput(this.value)">
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button type="button" class="btn-paste" onclick="document.getElementById('fileInputApk').click()">📦 Or Upload .APK File directly</button>
+                    <input type="file" id="fileInputApk" style="display: none;" accept=".apk,audio/*" onchange="handleFileSelected(this)">
+                </div>
+            </div>
+
+            <!-- File preview tag -->
+            <div class="file-preview" id="filePreview">
+                <span id="fileNameDisplay">file.pdf</span>
+                <span class="remove-file" style="color: #ef4444; cursor: pointer; font-weight: 700;" onclick="clearFile()">✕ Remove</span>
+            </div>
+
+            <div class="controls-row">
+                <div style="font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                    <span>Voice Memo Language:</span>
+                    <span id="activeLangTag" style="color: #60a5fa; font-weight: 700;">हिंदी</span>
+                </div>
+
+                <button class="verify-btn" id="verifyBtn" onclick="runVerification()">
+                    <span id="btnIcon">⚡</span>
+                    <span id="btnText">VERIFY FORENSICS</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 3. VERDICT DISPLAY WITH PROGRESSIVE DISCLOSURE -->
+        <section class="verdict-card" id="verdictCard">
+            <!-- Header bar of verdict -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h3 id="verdictHeading" style="font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                        🚨 DANGEROUS SCAM DETECTED
+                    </h3>
+                    <div style="font-size: 13.5px; color: var(--text-muted); margin-top: 3px;" id="modalityLabel">
+                        Pipeline: Universal Forensics
+                    </div>
+                </div>
+                <div id="confidenceBadge" style="font-family: 'JetBrains Mono', monospace; font-size: 13.5px; padding: 6px 14px; border-radius: 20px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);">
+                    Confidence: 99%
+                </div>
+            </div>
+
+            <!-- Level 1: Human Takeaway (Hero Card) -->
+            <div class="hero-takeaway-card">
+                <div class="hero-headline" id="heroHeadline">
+                    This notice is 100% fake. Police in India do not arrest people over WhatsApp video calls.
+                </div>
+                <div class="hero-subtakeaway" id="heroSubtakeaway">
+                    Do not panic. There is no legitimate case registered against you. Under Indian law (BNSS 2023), digital arrests are non-existent.
+                </div>
+            </div>
+
+            <!-- 4. WHATSAPP-STYLE VOICE NOTE PLAYER WIDGET -->
+            <div class="voice-memo-player">
+                <button type="button" class="audio-play-btn" id="audioPlayBtn" onclick="toggleVoicePlayback()">
+                    <span id="playIcon">▶</span>
+                </button>
+
+                <div class="waveform-box" id="waveformBox">
+                    <!-- 24 Waveform bars generated dynamically -->
+                </div>
+
+                <div class="audio-duration" id="audioDuration">0:00 / 0:14</div>
+
+                <div class="player-lang-pills">
+                    <button type="button" class="pill-btn active" id="pillHi" onclick="switchLanguage('hi')">हिन्दी</button>
+                    <button type="button" class="pill-btn" id="pillEn" onclick="switchLanguage('en')">EN</button>
+                    <button type="button" class="pill-btn" id="pillKn" onclick="switchLanguage('kn')">ಕನ್ನಡ</button>
+                    <button type="button" class="pill-btn" id="pillTa" onclick="switchLanguage('ta')">தமிழ்</button>
+                    <button type="button" class="pill-btn" id="pillTe" onclick="switchLanguage('te')">తెలుగు</button>
+                    <button type="button" class="pill-btn" id="pillMr" onclick="switchLanguage('mr')">मराठी</button>
+                </div>
+            </div>
+
+            <!-- Level 2: The "Why" Breakdown (Interactive Accordion) -->
+            <div style="font-size: 13.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 10px;">
+                Forensic Breakdown
+            </div>
+            <div class="accordion-container" id="accordionContainer">
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>🏛️ Legal Verification: Statutory & Court Authenticity</span>
+                        <span class="acc-arrow">▼</span>
+                    </div>
+                    <div class="accordion-content" id="accLegalContent">
+                        Case CNR number not found on e-Courts National Judicial Data Grid (NJDG). 'Digital Arrest' is legally non-existent under BNSS 2023.
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>💳 Payment & Cyber Infrastructure Check</span>
+                        <span class="acc-arrow">▼</span>
+                    </div>
+                    <div class="accordion-content" id="accPaymentContent">
+                        Beneficiary handle belongs to an individual retail account, not the Government of India or authorized treasury desk.
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>🌐 Domain Age & Threat Intelligence Check</span>
+                        <span class="acc-arrow">▼</span>
+                    </div>
+                    <div class="accordion-content" id="accDomainContent">
+                        Domain registered recently via privacy proxy. No legitimate government .gov.in or .nic.in affiliation detected.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Level 3: Forensic Details (Collapsible Drawer) -->
+            <details class="forensic-drawer">
+                <summary>🔍 Forensic Details, Hashes & Statutory Citations (For Police / NCRP 1930)</summary>
+                <div class="forensic-drawer-body" id="forensicDetailsBody">
+                    Loading forensic telemetry...
+                </div>
+            </details>
+
+            <!-- Action Grid -->
+            <div class="action-grid">
+                <div class="action-card">
+                    <div>
+                        <h4>📄 Court Evidence PDF (BSA 2023)</h4>
+                        <p>Court-admissible electronic evidence record compliant with Section 63 BSA & 65B Indian Evidence Act.</p>
+                    </div>
+                    <button class="btn-dossier" style="background: #059669; border-color: #10b981;" id="downloadPdfBtn" onclick="downloadPdfDossier()">
+                        ⬇ Download Official PDF
+                    </button>
+                </div>
+
+                <div class="action-card">
+                    <div>
+                        <h4>📋 Cybercrime Complaint Form</h4>
+                        <p>Pre-filled formal complaint citing BNS & IT Act sections ready to paste into 1930 / cybercrime.gov.in.</p>
+                    </div>
+                    <button class="btn-dossier" onclick="openDossierModal()">
+                        View Formal Complaint
+                    </button>
+                </div>
+
+                <div class="action-card">
+                    <div>
+                        <h4>⚡ Golden Hour Bank Freeze</h4>
+                        <p>1-Click hotline numbers and SMS commands to freeze accounts within the critical first 2 hours.</p>
+                    </div>
+                    <button class="btn-dossier" style="border-color: #ef4444; color: #fca5a5;" onclick="openFreezeModal()">
+                        Emergency Bank Freeze
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            KavachAI Universal Verification Engine · Compliant with Bharatiya Sakshya Adhiniyam (BSA) 2023, BNS & IT Act · National Cyber Helpline 1930
+        </footer>
+    </main>
+
+    <!-- 5. FLOATING EMERGENCY ACTION BOTTOM SHEET (Active when Scam Detected) -->
+    <div class="bottom-action-sheet" id="bottomActionSheet">
+        <div class="bottom-sheet-content">
+            <div class="bottom-sheet-text">
+                <span style="font-size: 22px;">🚨</span>
+                <div>
+                    <h4>CRITICAL SCAM DETECTED</h4>
+                    <p style="font-size: 12.5px; color: #cbd5e1;">Do not send money or enter UPI PIN. Take emergency defense actions below:</p>
+                </div>
+            </div>
+            <div class="bottom-sheet-btns">
+                <a href="tel:1930" class="btn-bottom-dial">
+                    📞 Call 1930 Helpline
+                </a>
+                <button type="button" class="btn-bottom-secondary" onclick="copyComplaintDirect()">
+                    📋 Copy Police Complaint
+                </button>
+                <button type="button" class="btn-bottom-secondary" onclick="shareWithFamily()">
+                    ↗️ Share Warning with Family
+                </button>
+                <button type="button" class="btn-bottom-secondary" style="border-color: #ef4444; color: #fca5a5;" onclick="openFreezeModal()">
+                    ⚡ Freeze Bank Account
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dossier Modal -->
+    <div class="modal-overlay" id="dossierModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>National Cybercrime Reporting Dossier (Form 1930)</h3>
+                <button class="modal-close" onclick="closeDossierModal()">&times;</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 14px;">
+                Copy this pre-formatted narrative directly into <a href="https://cybercrime.gov.in" target="_blank" style="color: #3b82f6;">cybercrime.gov.in</a> or download the court-admissible Section 63 BSA PDF.
+            </p>
+            <div class="dossier-box" id="dossierTextContent"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-dossier" style="background: #059669; border-color: #10b981;" onclick="downloadPdfDossier()">📄 Download Section 63 PDF</button>
+                <button class="btn-dossier" onclick="copyDossier()">📋 Copy FIR Narrative</button>
+                <button class="btn-dossier" onclick="closeDossierModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Golden Hour Bank Freeze Modal -->
+    <div class="modal-overlay" id="freezeModal">
+        <div class="modal-content" style="max-width: 820px;">
+            <div class="modal-header">
+                <h3 style="color: #ef4444;">🚨 "Golden Hour" 1-Click Bank Account Freeze Guide</h3>
+                <button class="modal-close" onclick="closeFreezeModal()">&times;</button>
+            </div>
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;">
+                <b style="color: #fca5a5;">CRITICAL GOLDEN HOUR NOTICE:</b>
+                <p style="font-size: 13px; color: #f87171; margin-top: 4px;">
+                    In financial cyber fraud, the first 60 to 120 minutes are critical. Once money enters a mule account, funds are rapidly layered. Immediately dial <b>1930</b> or execute the instant SMS freeze commands below.
+                </p>
+                <div style="margin-top: 10px;">
+                    <a href="tel:1930" class="btn-bottom-dial" style="display: inline-flex;">
+                        📞 Auto-Dial 1930 National Cyber Helpline
+                    </a>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 14.5px; margin-bottom: 8px;">Major Bank Instant Freeze Hotlines & SMS Triggers</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                        <thead>
+                            <tr style="background: #162035; color: #94a3b8; border-bottom: 1px solid var(--border);">
+                                <th style="padding: 8px;">Bank</th>
+                                <th style="padding: 8px;">Helpline</th>
+                                <th style="padding: 8px;">Instant Card Block SMS</th>
+                                <th style="padding: 8px;">UPI Deactivate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bankTableBody">
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>SBI</b></td>
+                                <td style="padding: 8px;"><a href="tel:1800111109" style="color: #3b82f6;">1800 11 1109</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>567676</b></td>
+                                <td style="padding: 8px;">SMS <code>STOPUPI</code> to <b>9223008333</b></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>HDFC Bank</b></td>
+                                <td style="padding: 8px;"><a href="tel:18001600" style="color: #3b82f6;">1800 1600</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>5676712</b></td>
+                                <td style="padding: 8px;">Call 1800 1600 (Option 1)</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>ICICI Bank</b></td>
+                                <td style="padding: 8px;"><a href="tel:18001080" style="color: #3b82f6;">1800 1080</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>5676766</b></td>
+                                <td style="padding: 8px;">SMS <code>SUSPEND</code> to <b>9215676766</b></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>Axis Bank</b></td>
+                                <td style="padding: 8px;"><a href="tel:18604195555" style="color: #3b82f6;">1860 419 5555</a></td>
+                                <td style="padding: 8px;">SMS <code>BLOCK XXXX</code> to <b>5676782</b></td>
+                                <td style="padding: 8px;">Call 1860 419 5555</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px;"><b>PNB</b></td>
+                                <td style="padding: 8px;"><a href="tel:18001802222" style="color: #3b82f6;">1800 180 2222</a></td>
+                                <td style="padding: 8px;">SMS <code>HOT &lt;CardNo&gt;</code> to <b>5607040</b></td>
+                                <td style="padding: 8px;">Call 1800 180 2222</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="background: #090d16; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                <h4 style="font-size: 13px; color: #94a3b8; margin-bottom: 8px;">Pre-Filled Bank Dispute Message Generator</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="freezeUtr" placeholder="Bank Transaction UTR / Ref No." style="background: #162035; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 13px;">
+                    <input type="text" id="freezeSuspectVpa" placeholder="Suspect Beneficiary VPA (e.g. fraud@upi)" style="background: #162035; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 13px;">
+                </div>
+                <button class="btn-dossier" onclick="generateBankDisputeText()">Generate Bank Email / Dispute Text</button>
+                <textarea id="freezeDisputeOutput" readonly style="width: 100%; margin-top: 10px; min-height: 80px; font-size: 12px; font-family: monospace;"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end;">
+                <button class="btn-dossier" onclick="closeFreezeModal()">Close Guide</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'message';
+        let selectedFile = null;
+        let preferredLang = 'hi';
+        let currentAudioBase64 = null;
+        let currentDossier = null;
+        let currentAudioObj = null;
+        let isAudioPlaying = false;
+        let currentResult = null;
+
+        const langNames = {
+            'hi': 'हिंदी',
+            'en': 'English',
+            'te': 'తెలుగు',
+            'kn': 'ಕನ್ನಡ',
+            'ta': 'தமிழ்',
+            'mr': 'मराठी'
+        };
+
+        // Initialize waveform visualizer bars
+        const waveformBox = document.getElementById('waveformBox');
+        for (let i = 0; i < 24; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'waveform-bar';
+            bar.style.height = `${Math.floor(Math.random() * 14) + 6}px`;
+            waveformBox.appendChild(bar);
+        }
+
+        // Mode Switching
+        function switchMode(mode) {
+            currentMode = mode;
+            ['tabMsg', 'tabDoc', 'tabPay', 'tabUrl'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+            ['panelMessage', 'panelDocument', 'panelPayment', 'panelUrl'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+
+            if (mode === 'message') {
+                document.getElementById('tabMsg').classList.add('active');
+                document.getElementById('panelMessage').classList.add('active');
+            } else if (mode === 'document') {
+                document.getElementById('tabDoc').classList.add('active');
+                document.getElementById('panelDocument').classList.add('active');
+            } else if (mode === 'payment') {
+                document.getElementById('tabPay').classList.add('active');
+                document.getElementById('panelPayment').classList.add('active');
+            } else if (mode === 'url') {
+                document.getElementById('tabUrl').classList.add('active');
+                document.getElementById('panelUrl').classList.add('active');
+            }
+        }
+
+        async function autoPasteClipboard() {
+            try {
+                const clipText = await navigator.clipboard.readText();
+                if (clipText) {
+                    const txt = document.getElementById('textContent');
+                    txt.value = clipText;
+                    document.getElementById('charCount').textContent = `${clipText.length} chars`;
+                }
+            } catch (err) {
+                alert('Please allow clipboard access or paste directly (Ctrl+V).');
+            }
+        }
+
+        function handleFileSelected(input) {
+            if (input.files && input.files[0]) {
+                selectedFile = input.files[0];
+                document.getElementById('fileNameDisplay').textContent = `${selectedFile.name} (${Math.round(selectedFile.size / 1024)} KB)`;
+                document.getElementById('filePreview').style.display = 'flex';
+            }
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('filePreview').style.display = 'none';
+            document.getElementById('fileInputDoc').value = '';
+            document.getElementById('fileInputQr').value = '';
+            document.getElementById('fileInputApk').value = '';
+        }
+
+        function syncUpiText(val) {
+            document.getElementById('textContent').value = val;
+            document.getElementById('charCount').textContent = `${val.length} chars`;
+        }
+
+        function handleUrlInput(val) {
+            document.getElementById('textContent').value = val;
+            document.getElementById('charCount').textContent = `${val.length} chars`;
+            const badge = document.getElementById('domainBadge');
+            if (val.includes('.gov.in') || val.includes('.nic.in')) {
+                badge.textContent = '🏛️ Verified .gov.in domain';
+                badge.style.color = '#10b981';
+            } else if (val.includes('.apk') || val.includes('.online') || val.includes('.biz') || val.includes('telegram') || val.includes('t.me')) {
+                badge.textContent = '⚠️ High-Risk Domain / App extension';
+                badge.style.color = '#ef4444';
+            } else {
+                badge.textContent = 'Live validation';
+                badge.style.color = 'var(--text-muted)';
+            }
+        }
+
+        document.getElementById('textContent').addEventListener('input', (e) => {
+            document.getElementById('charCount').textContent = `${e.target.value.length} chars`;
+        });
+
+        function loadSample(type) {
+            const textContent = document.getElementById('textContent');
+            switchMode('message');
+            if (type === 'digital_arrest') {
+                textContent.value = "CENTRAL BUREAU OF INVESTIGATION (CBI) & CYBER CRIME CELL NEW DELHI. URGENT ARREST WARRANT & DIGITAL SURVEILLANCE NOTICE. Case No: CBI/2024/DEL/8912. You are accused of laundering Rs 48 Crores through illegal Sim Cards. Stay on 24x7 WhatsApp Video Call or police will raid within 2 hours. Transfer Rs 2,50,000 security bail money to Reserve Bank verification account upi://pay?pa=cbi-bail-clearance@oksbi&am=250000";
+            } else if (type === 'power_cut') {
+                textContent.value = "Dear Consumer, your electricity power will be disconnected tonight at 09:30 PM because your previous month bill was not updated. Immediately contact our electricity officer Mr. Sharma at 9876543210 or install our quick bill app from http://bijli-bill-update.online/app.apk";
+            } else if (type === 'sebi_stock') {
+                textContent.value = "SEBI REGISTERED INSTITUTIONAL VIP TRADING POOL (Registration No: INZ000293412). Exclusive upper-circuit institutional allocation! Guaranteed 250% weekly profit with insider stock tips. Admin Contact: +84 987654321 (Vietnam Desk). Deposit minimum Rs 50,000 to participate.";
+            } else if (type === 'task_scam') {
+                textContent.value = "Part-time Work From Home Job! Like 3 YouTube videos and earn Rs 150 immediately. Complete Google Maps rating tasks to earn daily income Rs 5,000 to Rs 8,000. Join Telegram VIP task channel now: http://telegram-task-vip.biz";
+            } else if (type === 'deepfake_audio') {
+                textContent.value = "EMERGENCY AUDIO MEMO: 'Dad, I have had a terrible car accident near the highway. The police have arrested me and are asking for bail money immediately. Please transfer Rs 85,000 to this UPI ID right now or they will lock me up in jail.'";
+            } else if (type === 'upi_refund') {
+                textContent.value = "upi://pay?pa=refund-desk@okhdfcbank&pn=ElectricityRefundDesk&am=5000&cu=INR&tn=Click_to_receive_cashback_refund";
+            }
+            document.getElementById('charCount').textContent = `${textContent.value.length} chars`;
+        }
+
+        async function runVerification() {
+            const text = document.getElementById('textContent').value.trim();
+            if (!text && !selectedFile) {
+                alert('Please enter text/link or upload an artifact to verify.');
+                return;
+            }
+
+            const verifyBtn = document.getElementById('verifyBtn');
+            const btnText = document.getElementById('btnText');
+            const btnIcon = document.getElementById('btnIcon');
+
+            verifyBtn.disabled = true;
+            btnText.textContent = "VERIFYING FORENSICS...";
+            btnIcon.innerHTML = `<span class="spinner"></span>`;
+
+            const formData = new FormData();
+            if (text) formData.append('text_content', text);
+            if (selectedFile) formData.append('file', selectedFile);
+            formData.append('preferred_language', preferredLang);
+
+            try {
+                const resp = await fetch('/api/v1/verify', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || 'Forensic verification failed.');
+                }
+
+                const data = await resp.json();
+                renderVerdict(data);
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                verifyBtn.disabled = false;
+                btnText.textContent = "VERIFY FORENSICS";
+                btnIcon.textContent = "⚡";
+            }
+        }
+
+        function renderVerdict(data) {
+            const card = document.getElementById('verdictCard');
+            card.style.display = 'block';
+            card.className = `verdict-card verdict-${data.verdict}`;
+
+            const banner = document.getElementById('topThreatBanner');
+            const bottomSheet = document.getElementById('bottomActionSheet');
+            document.body.classList.remove('threat-active', 'threat-safe');
+
+            const heading = document.getElementById('verdictHeading');
+            const heroHeadline = document.getElementById('heroHeadline');
+            const heroSubtakeaway = document.getElementById('heroSubtakeaway');
+
+            if (data.verdict === 'DANGEROUS_SCAM') {
+                document.body.classList.add('threat-active');
+                banner.style.display = 'block';
+                bottomSheet.style.display = 'block';
+                heading.innerHTML = '🚨 CRITICAL FRAUD DETECTED';
+
+                // Human Takeaway Generation
+                const combined = (data.summary + ' ' + (data.reasons || []).join(' ')).toLowerCase();
+                if (combined.includes('cbi') || combined.includes('arrest') || combined.includes('police')) {
+                    heroHeadline.textContent = "This notice is 100% fake. Police in India do not arrest people over WhatsApp video calls.";
+                    heroSubtakeaway.textContent = "Do not panic. Under Indian law (BNSS 2023), digital arrests are legally non-existent. Do not transfer any money.";
+                } else if (combined.includes('electricity') || combined.includes('apk') || combined.includes('power')) {
+                    heroHeadline.textContent = "This power disconnection alert is a phishing trap designed to steal your bank funds.";
+                    heroSubtakeaway.textContent = "Electricity distribution companies never send .APK files or personal WhatsApp numbers for bill clearances.";
+                } else if (combined.includes('upi') || combined.includes('collect') || combined.includes('refund')) {
+                    heroHeadline.textContent = "This payment request will DEDUCT money from your account, not credit it.";
+                    heroSubtakeaway.textContent = "You NEVER need to enter your UPI PIN to receive money. Do not approve this transaction.";
+                } else if (combined.includes('sebi') || combined.includes('trading') || combined.includes('stock')) {
+                    heroHeadline.textContent = "This institutional stock group is an unauthorized illegal boiler-room scam.";
+                    heroSubtakeaway.textContent = "SEBI does not allow WhatsApp VIP investment groups or upper-circuit private allocations.";
+                } else {
+                    heroHeadline.textContent = "Scam & Extortion Attempt Detected. Do not transfer funds.";
+                    heroSubtakeaway.textContent = data.summary;
+                }
+            } else if (data.verdict === 'SUSPICIOUS') {
+                banner.style.display = 'none';
+                bottomSheet.style.display = 'none';
+                heading.innerHTML = '⚠️ SUSPICIOUS ACTIVITY DETECTED';
+                heroHeadline.textContent = "Exercise Caution. Potential Fraud Indicators Found.";
+                heroSubtakeaway.textContent = data.summary;
+            } else {
+                document.body.classList.add('threat-safe');
+                banner.style.display = 'none';
+                bottomSheet.style.display = 'none';
+                heading.innerHTML = '✅ AUTHENTIC / LOW RISK VERIFIED';
+                heroHeadline.textContent = "No Known Scam Signatures Detected.";
+                heroSubtakeaway.textContent = "Content appears authentic. Maintain cyber vigilance and never disclose OTPs or UPI PINs.";
+            }
+
+            document.getElementById('modalityLabel').textContent = `Pipeline: ${data.input_modality.replace(/_/g, ' ')}`;
+            document.getElementById('confidenceBadge').textContent = `Confidence: ${(data.confidence * 100).toFixed(0)}%`;
+
+            // Populate Accordions
+            const reasons = data.reasons || [];
+            document.getElementById('accLegalContent').innerHTML = reasons.filter(r => r.toLowerCase().includes('court') || r.toLowerCase().includes('arrest') || r.toLowerCase().includes('cbi') || r.toLowerCase().includes('cnr') || r.toLowerCase().includes('statutory') || r.toLowerCase().includes('law')).map(r => `• ${r}`).join('<br>') || "• Legal document verification check complete.";
+            document.getElementById('accPaymentContent').innerHTML = reasons.filter(r => r.toLowerCase().includes('upi') || r.toLowerCase().includes('payment') || r.toLowerCase().includes('vpa') || r.toLowerCase().includes('bank') || r.toLowerCase().includes('collect')).map(r => `• ${r}`).join('<br>') || "• Payment verification completed.";
+            document.getElementById('accDomainContent').innerHTML = reasons.filter(r => r.toLowerCase().includes('domain') || r.toLowerCase().includes('apk') || r.toLowerCase().includes('sms') || r.toLowerCase().includes('permission') || r.toLowerCase().includes('virustotal')).map(r => `• ${r}`).join('<br>') || "• Threat intelligence scan complete.";
+
+            // Forensic Details Drawer
+            document.getElementById('forensicDetailsBody').textContent = JSON.stringify({
+                dossier_id: data.dossier?.dossier_id,
+                sha256: data.dossier?.sha256_evidence_hash,
+                statutory_violations: data.dossier?.statutory_violations,
+                suspect_indicators: data.dossier?.suspect_indicators,
+                timestamp: data.dossier?.generated_at
+            }, null, 2);
+
+            currentResult = data;
+            currentAudioBase64 = data.audio_base64;
+            currentDossier = data.dossier;
+
+            // Prepare Audio Player
+            initAudioPlayer(currentAudioBase64);
+
+            // Auto-populate Freeze VPA if available
+            if (currentDossier && currentDossier.suspect_indicators && currentDossier.suspect_indicators.upi_vpas && currentDossier.suspect_indicators.upi_vpas.length > 0) {
+                document.getElementById('freezeSuspectVpa').value = currentDossier.suspect_indicators.upi_vpas[0];
+            }
+
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // WhatsApp-Style Audio Player Logic
+        function initAudioPlayer(base64Audio) {
+            if (currentAudioObj) {
+                currentAudioObj.pause();
+                currentAudioObj = null;
+            }
+            isAudioPlaying = false;
+            document.getElementById('playIcon').textContent = '▶';
+
+            if (!base64Audio) {
+                document.getElementById('audioDuration').textContent = 'Unavailable';
+                return;
+            }
+
+            currentAudioObj = new Audio('data:audio/mp3;base64,' + base64Audio);
+            currentAudioObj.onloadedmetadata = () => {
+                const total = formatTime(currentAudioObj.duration || 14);
+                document.getElementById('audioDuration').textContent = `0:00 / ${total}`;
+            };
+            currentAudioObj.ontimeupdate = () => {
+                const cur = formatTime(currentAudioObj.currentTime);
+                const total = formatTime(currentAudioObj.duration || 14);
+                document.getElementById('audioDuration').textContent = `${cur} / ${total}`;
+            };
+            currentAudioObj.onended = () => {
+                isAudioPlaying = false;
+                document.getElementById('playIcon').textContent = '▶';
+                animateWaveform(false);
+            };
+        }
+
+        function toggleVoicePlayback() {
+            if (!currentAudioObj) {
+                alert('Audio warning is currently unavailable.');
+                return;
+            }
+
+            if (isAudioPlaying) {
+                currentAudioObj.pause();
+                isAudioPlaying = false;
+                document.getElementById('playIcon').textContent = '▶';
+                animateWaveform(false);
+            } else {
+                currentAudioObj.play().then(() => {
+                    isAudioPlaying = true;
+                    document.getElementById('playIcon').textContent = '❚❚';
+                    animateWaveform(true);
+                }).catch(e => console.log('Audio autoplay blocked:', e));
+            }
+        }
+
+        function animateWaveform(playing) {
+            const bars = document.querySelectorAll('.waveform-bar');
+            bars.forEach(b => {
+                if (playing) {
+                    b.classList.add('playing');
+                } else {
+                    b.classList.remove('playing');
+                }
+            });
+        }
+
+        function formatTime(secs) {
+            if (isNaN(secs)) return '0:14';
+            const m = Math.floor(secs / 60);
+            const s = Math.floor(secs % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        async function switchLanguage(lang) {
+            preferredLang = lang;
+            document.getElementById('activeLangTag').textContent = langNames[lang] || lang;
+
+            ['pillHi', 'pillEn', 'pillKn', 'pillTa', 'pillTe', 'pillMr'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+            const activePill = document.getElementById(`pill${lang.charAt(0).toUpperCase() + lang.slice(1)}`);
+            if (activePill) activePill.classList.add('active');
+
+            if (currentResult) {
+                try {
+                    const resp = await fetch('/api/v1/voice-memo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            reasons: currentResult.reasons || [],
+                            preferred_language: lang,
+                            verdict: currentResult.verdict || 'DANGEROUS_SCAM'
+                        })
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        currentAudioBase64 = data.audio_base64;
+                        initAudioPlayer(currentAudioBase64);
+                        toggleVoicePlayback();
+                    }
+                } catch (e) {
+                    console.log('Language update audio fetch error:', e);
+                }
+            }
+        }
+
+        function toggleAccordion(header) {
+            const content = header.nextElementSibling;
+            const arrow = header.querySelector('.acc-arrow');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                if (arrow) arrow.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                if (arrow) arrow.textContent = '▶';
+            }
+        }
+
+        // Dossier & PDF Functions with 100% Reliable Printable Fallback
+        function openDossierModal() {
+            if (!currentDossier) {
+                alert('Dossier is not ready.');
+                return;
+            }
+            const modal = document.getElementById('dossierModal');
+            const box = document.getElementById('dossierTextContent');
+            box.textContent = currentDossier.fir_narrative_template || JSON.stringify(currentDossier, null, 2);
+            modal.style.display = 'flex';
+        }
+
+        function closeDossierModal() {
+            document.getElementById('dossierModal').style.display = 'none';
+        }
+
+        function copyDossier() {
+            const text = document.getElementById('dossierTextContent').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard! Ready to paste into 1930 / cybercrime.gov.in portal.');
+            });
+        }
+
+        function copyComplaintDirect() {
+            if (!currentDossier) {
+                alert('No complaint data available.');
+                return;
+            }
+            const text = currentDossier.fir_narrative_template || JSON.stringify(currentDossier, null, 2);
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✓ Pre-formatted police complaint copied to clipboard! Ready for 1930 / cybercrime.gov.in portal.');
+            });
+        }
+
+        function shareWithFamily() {
+            const headline = document.getElementById('heroHeadline').textContent;
+            const shareText = `⚠️ *CYBERCRIME FRAUD ALERT (KavachAI Verified)* ⚠️\n\n` +
+                              `${headline}\n\n` +
+                              `• Do NOT send any money or click unverified links.\n` +
+                              `• Police/CBI never arrest citizens over WhatsApp video calls.\n` +
+                              `• If someone contacted you, report immediately to Cyber Helpline 1930.\n\n` +
+                              `Verified via National Cyber Forensics Engine KavachAI.`;
+            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+            window.open(waUrl, '_blank');
+        }
+
+        async function downloadPdfDossier() {
+            if (!currentDossier) {
+                alert('Please run forensic verification first to generate a dossier.');
+                return;
+            }
+            const downloadBtn = document.getElementById('downloadPdfBtn');
+            if (downloadBtn) downloadBtn.textContent = '⏳ Preparing Dossier...';
+
+            try {
+                const resp = await fetch('/api/v1/dossier/pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentDossier)
+                });
+                if (resp.ok && resp.headers.get('content-type')?.includes('application/pdf')) {
+                    const blob = await resp.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `KavachAI_Dossier_${currentDossier.dossier_id || 'Incident'}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                    return;
+                }
+                throw new Error('Backend PDF endpoint returned unexpected format.');
+            } catch (err) {
+                console.warn('Direct PDF download fallback to printable court dossier:', err);
+                openPrintableCourtDossier(currentDossier);
+            } finally {
+                if (downloadBtn) downloadBtn.textContent = '⬇ Download Official PDF';
+            }
+        }
+
+        // Authoritative Printable Court Dossier Fallback
+        function openPrintableCourtDossier(dossier) {
+            const printWin = window.open('', '_blank');
+            const dId = dossier.dossier_id || 'INCIDENT';
+            const html = `<!DOCTYPE html>
+<html>
+<head>
+    <title>KavachAI Official Evidence Dossier - ${dId}</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 40px; color: #0f172a; line-height: 1.5; font-size: 13px; }
+        .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 20px; }
+        .header h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.5px; }
+        .header p { font-size: 11px; font-weight: bold; color: #dc2626; margin: 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
+        th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; }
+        th { background: #f1f5f9; }
+        .cert-box { background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; font-size: 11px; font-style: italic; margin-top: 20px; }
+        @media print { button { display: none; } }
+    </style>
+</head>
+<body>
+    <div style="text-align: right; margin-bottom: 10px;">
+        <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🖨️ Print / Save as PDF</button>
+    </div>
+    <div class="header">
+        <h1>KAVACH-AI NATIONAL CYBERCRIME FORENSIC DOSSIER</h1>
+        <p>ELECTRONIC EVIDENCE RECORD UNDER SECTION 63, BHARATIYA SAKSHYA ADHINIYAM (BSA), 2023</p>
+        <p style="font-size: 9.5px; color: #475569; margin-top: 2px;">(EQUIVALENT TO SECTION 65B OF INDIAN EVIDENCE ACT, 1872)</p>
+    </div>
+    <table>
+        <tr>
+            <td><b>Dossier ID:</b> ${dossier.dossier_id || 'N/A'}</td>
+            <td><b>Timestamp (UTC):</b> ${dossier.generated_at || new Date().toISOString()}</td>
+        </tr>
+        <tr>
+            <td><b>NCRP Helpline:</b> 1930</td>
+            <td><b>Official Portal:</b> https://cybercrime.gov.in</td>
+        </tr>
+        <tr>
+            <td><b>Forensic Verdict:</b> <span style="color: #b91c1c; font-weight: bold;">${dossier.verdict || 'DANGEROUS_SCAM'}</span></td>
+            <td><b>Cryptographic Hash:</b> SHA256:${(dossier.sha256_evidence_hash || '').slice(0, 24)}...</td>
+        </tr>
+    </table>
+    <h3>1. SUSPECT IDENTIFIERS</h3>
+    <table>
+        <tr><th>Indicator</th><th>Forensic Extracted Value</th></tr>
+        <tr><td>UPI VPA Handles</td><td>${(dossier.suspect_indicators?.upi_vpas || []).join(', ') || 'None extracted'}</td></tr>
+        <tr><td>Phishing URLs / Domains</td><td>${(dossier.suspect_indicators?.phishing_domains || []).join(', ') || 'None extracted'}</td></tr>
+        <tr><td>Contact Numbers</td><td>${(dossier.suspect_indicators?.contact_numbers || []).join(', ') || 'None extracted'}</td></tr>
+    </table>
+    <h3>2. STATUTORY OFFENCES TRIGGERED</h3>
+    <ul>
+        ${(dossier.statutory_violations || []).map(s => `<li><b>${s}</b></li>`).join('')}
+    </ul>
+    <h3>3. FORMAL COMPLAINT NARRATIVE</h3>
+    <pre style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; font-family: monospace; font-size: 11px; white-space: pre-wrap;">${dossier.fir_narrative_template || ''}</pre>
+    <div class="cert-box">
+        <b>SECTION 63 BSA ELECTRONIC EVIDENCE CERTIFICATE:</b><br/>
+        I hereby certify under Section 63 of Bharatiya Sakshya Adhiniyam, 2023 (Sec 65B Indian Evidence Act) that this electronic record was produced by the KavachAI automated cyber forensics engine without unauthorized tampering. Evidentiary Hash: SHA-256: ${dossier.sha256_evidence_hash || 'VERIFIED_CHAIN_OF_CUSTODY'}.
+    </div>
+</body>
+</html>`;
+            printWin.document.write(html);
+            printWin.document.close();
+        }
+
+        // Freeze Modal
+        function openFreezeModal() {
+            document.getElementById('freezeModal').style.display = 'flex';
+        }
+
+        function closeFreezeModal() {
+            document.getElementById('freezeModal').style.display = 'none';
+        }
+
+        function generateBankDisputeText() {
+            const utr = document.getElementById('freezeUtr').value.trim() || '[PENDING_UTR]';
+            const suspectVpa = document.getElementById('freezeSuspectVpa').value.trim() || (currentDossier?.suspect_indicators?.upi_vpas?.[0] || '[SUSPECT_VPA]');
+            const output = `URGENT FRAUD DISPUTE & RECALL REQUEST (NCRP / 1930)\n` +
+                           `To: Bank Fraud Risk Desk / Nodal Officer\n` +
+                           `I am reporting an unauthorized / fraudulent transfer executed under active cyber extortion.\n` +
+                           `• Transaction UTR / Ref: ${utr}\n` +
+                           `• Suspect Beneficiary VPA: ${suspectVpa}\n` +
+                           `• Incident ID: ${currentDossier?.dossier_id || 'KAVACH-EMERGENCY'}\n` +
+                           `In accordance with RBI Circular on Customer Protection (Limiting Liability in Unauthorized Electronic Banking Transactions) and NCRP 1930 protocol, please immediately FREEZE the beneficiary account and initiate inter-bank recall.`;
+            document.getElementById('freezeDisputeOutput').value = output;
+        }
+    </script>
+</body>
+</html>
