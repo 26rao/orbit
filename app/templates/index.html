@@ -1310,6 +1310,7 @@
             <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
                 <button class="btn-dossier" style="background: #059669; border-color: #10b981;" onclick="downloadPdfDossier()">📄 Download Section 63 PDF</button>
                 <button class="btn-dossier" onclick="copyDossier()">📋 Copy FIR Narrative</button>
+                <button class="btn-dossier" style="background: #15803d; border-color: #22c55e;" onclick="shareDossierWhatsApp()">💬 Share on WhatsApp</button>
                 <button class="btn-dossier" onclick="closeDossierModal()">Close</button>
             </div>
         </div>
@@ -1879,11 +1880,44 @@
             document.getElementById('dossierModal').style.display = 'none';
         }
 
+        function copyTextToClipboard(text, successMsg) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert(successMsg || '✓ Copied to clipboard!');
+                }).catch(() => {
+                    fallbackCopy(text, successMsg);
+                });
+            } else {
+                fallbackCopy(text, successMsg);
+            }
+        }
+
+        function fallbackCopy(text, successMsg) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try {
+                document.execCommand('copy');
+                alert(successMsg || '✓ Copied to clipboard!');
+            } catch (err) {
+                alert('Please select and copy the text manually.');
+            }
+            document.body.removeChild(ta);
+        }
+
         function copyDossier() {
             const text = document.getElementById('dossierTextContent').textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Copied to clipboard! Ready to paste into 1930 / cybercrime.gov.in portal.');
-            });
+            copyTextToClipboard(text, 'Copied to clipboard! Ready to paste into 1930 / cybercrime.gov.in portal.');
+        }
+
+        function shareDossierWhatsApp() {
+            const text = document.getElementById('dossierTextContent').textContent;
+            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+            window.open(waUrl, '_blank');
         }
 
         function copyComplaintDirect() {
@@ -1892,9 +1926,7 @@
                 return;
             }
             const text = currentDossier.fir_narrative_template || JSON.stringify(currentDossier, null, 2);
-            navigator.clipboard.writeText(text).then(() => {
-                alert('✓ Pre-formatted police complaint copied to clipboard! Ready for 1930 / cybercrime.gov.in portal.');
-            });
+            copyTextToClipboard(text, '✓ Pre-formatted police complaint copied to clipboard! Ready for 1930 / cybercrime.gov.in portal.');
         }
 
         function shareWithFamily() {

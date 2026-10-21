@@ -108,8 +108,10 @@ def analyze_domain_risk(url: str) -> List[str]:
                 if isinstance(creation_date, list):
                     creation_date = creation_date[0]
                 if creation_date and isinstance(creation_date, datetime.datetime):
-                    creation_clean = creation_date.replace(tzinfo=None)
-                    age_days = (datetime.datetime.utcnow() - creation_clean).days
+                    if creation_date.tzinfo is not None:
+                        age_days = (datetime.datetime.now(datetime.timezone.utc) - creation_date).days
+                    else:
+                        age_days = (datetime.datetime.now() - creation_date).days
                     if age_days < 7:
                         reasons.append(f"NEWLY REGISTERED DOMAIN: '{hostname}' was created only {age_days} days ago (typical of disposable phishing campaigns).")
             except Exception as e:
@@ -256,11 +258,20 @@ async def verify_text_and_links(
 
     # 2. Extract URLs and analyze domain threats
     extracted_urls = URL_REGEX.findall(content)
+    gov_urls = []
+    unverified_urls = []
     for url in extracted_urls:
         domain_reasons = analyze_domain_risk(url)
         if domain_reasons:
             reasons.extend(domain_reasons)
             confidence = max(confidence, 0.95)
+        else:
+            parsed = urlparse(url)
+            hostname = (parsed.hostname or "").lower()
+            if hostname.endswith(".gov.in") or hostname.endswith(".nic.in") or hostname.endswith(".ac.in") or hostname.endswith(".res.in"):
+                gov_urls.append(url)
+            else:
+                unverified_urls.append(url)
 
     # 3. Urgency / Coercion NLP Patterns
     content_lower = content.lower()
@@ -310,12 +321,21 @@ async def verify_text_and_links(
     if confidence >= 0.70:
         verdict = "DANGEROUS_SCAM"
         summary = "CRITICAL THREAT: Fraudulent phishing message / malicious payload designed to induce panic and steal credentials."
-    elif confidence >= 0.40 or len(extracted_urls) > 0:
+    elif confidence >= 0.40 or len(unverified_urls) > 0:
         verdict = "SUSPICIOUS"
         confidence = max(confidence, 0.60)
         summary = "SUSPICIOUS: Message contains unverified links or urgency signals. Do not click links or call the sender."
         if not reasons:
             reasons.append("Contains unverified external links from an unknown sender.")
+    elif len(gov_urls) > 0:
+        verdict = "AUTHENTIC"
+        confidence = 0.98
+        gov_domains = [urlparse(u).hostname for u in gov_urls if urlparse(u).hostname]
+        summary = f"AUTHENTIC: Legitimate official communication from verified government portal ({', '.join(gov_domains)})."
+        reasons = [
+            f"Official domain verified: Link '{gov_urls[0]}' belongs to authenticated Government of India infrastructure (.gov.in / .nic.in).",
+            "Message language is administrative/transactional with no coercive urgency or credential-stealing indicators."
+        ]
     else:
         verdict = "AUTHENTIC"
         confidence = 0.85
@@ -328,6 +348,8 @@ async def verify_text_and_links(
         "summary": summary,
         "reasons": reasons,
         "extracted_urls": extracted_urls,
+        "gov_urls": gov_urls,
+        "unverified_urls": unverified_urls,
         "urgency_triggers": urgency_detected,
         "apk_risk": apk_info,
         "extracted_contacts": extracted_phones,

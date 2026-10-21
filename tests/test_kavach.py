@@ -298,6 +298,22 @@ def test_voice_memo_endpoint():
         assert len(data["audio_base64"]) > 500
 
 
+def test_authentic_government_receipt():
+    """Verify that legitimate administrative notifications with .gov.in links are classified as AUTHENTIC."""
+    receipt_text = (
+        "Property Tax Payment of Rs. 4,200.00 successfully received for SAS Assessment Year 2026-27. "
+        "Application No: SAS-2026-892102. Download verified digital receipt from https://bbmp.gov.in using your property ID."
+    )
+    resp = client.post("/api/v1/verify-json", json={"text_content": receipt_text, "preferred_language": "en"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["verdict"] == "AUTHENTIC"
+    assert data["confidence"] >= 0.90
+    assert "bbmp.gov.in" in data["summary"]
+    # Ensure legitimate URL is not listed as suspect phishing domain
+    assert data["dossier"]["suspect_indicators"]["phishing_domains"] == []
+
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
 

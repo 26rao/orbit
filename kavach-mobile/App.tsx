@@ -138,29 +138,124 @@ export default function App() {
     }
   };
 
-  const shareDossier = async () => {
-    if (!result?.dossier?.fir_narrative_template) return;
+  const copyToClipboard = async (text: string, label: string = 'Content') => {
+    if (!text) return;
     try {
-      await Share.share({
-        message: result.dossier.fir_narrative_template,
-        title: 'National Cybercrime Portal Complaint Form 1930',
-      });
-    } catch (e) {
-      console.log('Share error:', e);
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        Alert.alert('✓ Copied!', `${label} copied to clipboard.`);
+        return;
+      }
+    } catch (err) {
+      console.warn('navigator.clipboard failed, attempting fallback', err);
     }
+
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (successful) {
+          Alert.alert('✓ Copied!', `${label} copied to clipboard.`);
+          return;
+        }
+      } catch (e) {
+        console.warn('execCommand copy failed', e);
+      }
+    }
+
+    try {
+      await Share.share({ message: text, title: label });
+    } catch (e) {
+      Alert.alert('Copy/Share', `Unable to copy: ${label}`);
+    }
+  };
+
+  const shareViaWhatsApp = async (text: string) => {
+    if (!text) return;
+    const encoded = encodeURIComponent(text);
+    const waWebUrl = `https://api.whatsapp.com/send?text=${encoded}`;
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        window.open(waWebUrl, '_blank');
+      }
+      return;
+    }
+
+    const waAppUrl = `whatsapp://send?text=${encoded}`;
+    try {
+      const supported = await Linking.canOpenURL(waAppUrl);
+      if (supported) {
+        await Linking.openURL(waAppUrl);
+      } else {
+        await Linking.openURL(waWebUrl);
+      }
+    } catch (err) {
+      Linking.openURL(waWebUrl).catch(() => {
+        Alert.alert('WhatsApp Error', 'Could not open WhatsApp.');
+      });
+    }
+  };
+
+  const getVerificationShareText = () => {
+    if (!result) return '';
+    if (result.verdict === 'AUTHENTIC') {
+      return `✅ *KAVACH-AI VERIFICATION: AUTHENTIC / LOW RISK*\n` +
+        `• Confidence: ${(result.confidence * 100).toFixed(0)}%\n` +
+        `• Summary: ${result.summary}\n` +
+        `• Reasons:\n${(result.reasons || []).map((r: string) => '  - ' + r).join('\n')}\n\n` +
+        `Verified via KavachAI National Scam Defense Console.`;
+    } else if (result.verdict === 'DANGEROUS_SCAM') {
+      const headline = getHeroHeadline();
+      return `🚨 *KAVACH-AI CYBERCRIME ALERT: CRITICAL FRAUD DETECTED*\n\n` +
+        `• Finding: ${headline}\n` +
+        `• Confidence: ${(result.confidence * 100).toFixed(0)}%\n\n` +
+        `⚠️ WARNING: Under Indian law (BNSS 2023), digital arrests do not exist. Do NOT transfer funds or enter UPI PINs.\n` +
+        `• If contacted, report immediately to Cyber Helpline 1930 or https://cybercrime.gov.in.\n\n` +
+        `Verified via KavachAI National Defense Console.`;
+    } else {
+      return `⚠️ *KAVACH-AI ALERT: SUSPICIOUS ACTIVITY*\n` +
+        `• Summary: ${result.summary}\n` +
+        `• Confidence: ${(result.confidence * 100).toFixed(0)}%\n` +
+        `• Reasons:\n${(result.reasons || []).map((r: string) => '  - ' + r).join('\n')}\n\n` +
+        `⚠️ Note: Do not click unverified links or share personal details.\n\n` +
+        `Verified via KavachAI.`;
+    }
+  };
+
+  const copyVerificationSummary = () => {
+    const text = getVerificationShareText();
+    copyToClipboard(text, 'Verification findings');
+  };
+
+  const shareVerificationWhatsApp = () => {
+    const text = getVerificationShareText();
+    shareViaWhatsApp(text);
+  };
+
+  const copyDossier = () => {
+    const text = result?.dossier?.fir_narrative_template || JSON.stringify(result?.dossier, null, 2) || '';
+    copyToClipboard(text, '1930 Police Complaint narrative');
+  };
+
+  const shareDossier = async () => {
+    const text = result?.dossier?.fir_narrative_template || JSON.stringify(result?.dossier, null, 2) || '';
+    shareViaWhatsApp(text);
   };
 
   const shareWarningWithFamily = async () => {
     const headline = getHeroHeadline();
-    const shareText = `⚠️ CYBERCRIME ALERT: ${headline}\n\nDo NOT transfer money or share UPI PINs. If someone contacted you claiming to be police/CBI, report immediately to Helpline 1930.\n\nVerified by KavachAI.`;
-    try {
-      await Share.share({
-        message: shareText,
-        title: 'Cybercrime Warning',
-      });
-    } catch (e) {
-      console.log('Share error:', e);
-    }
+    const shareText = `⚠️ *CYBERCRIME ALERT: ${headline}*\n\nDo NOT transfer money or share UPI PINs. If someone contacted you claiming to be police/CBI, report immediately to Helpline 1930.\n\nVerified by KavachAI.`;
+    shareViaWhatsApp(shareText);
   };
 
   const downloadPdf = async () => {
@@ -293,15 +388,35 @@ export default function App() {
         {/* Input Card */}
         <View style={styles.card}>
           {activeTab === 'message' && (
-            <TextInput
-              style={styles.textInput}
-              multiline
-              numberOfLines={4}
-              placeholder="Paste suspicious SMS, WhatsApp message, Telegram stock tip..."
-              placeholderTextColor="#64748b"
-              value={inputText}
-              onChangeText={setInputText}
-            />
+            <View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ color: '#94a3b8', fontSize: 12 }}>Suspicious SMS, WhatsApp, or Telegram message:</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+                        const clip = await navigator.clipboard.readText();
+                        if (clip) setInputText(clip);
+                      }
+                    } catch (e) {
+                      console.log('Clipboard read error', e);
+                    }
+                  }}
+                  style={{ paddingVertical: 3, paddingHorizontal: 8, backgroundColor: '#16233b', borderRadius: 4 }}
+                >
+                  <Text style={{ color: '#60a5fa', fontSize: 11, fontWeight: '700' }}>📋 Paste</Text>
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.textInput}
+                multiline
+                numberOfLines={4}
+                placeholder="Paste suspicious SMS, WhatsApp message, Telegram stock tip..."
+                placeholderTextColor="#64748b"
+                value={inputText}
+                onChangeText={setInputText}
+              />
+            </View>
           )}
 
           {activeTab === 'document' && (
@@ -532,6 +647,20 @@ export default function App() {
 
             {/* Export & Action Buttons */}
             <View style={{ marginTop: 18, gap: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { flex: 1, backgroundColor: '#2563eb' }]}
+                  onPress={copyVerificationSummary}
+                >
+                  <Text style={styles.actionBtnText}>📋 Copy to Clipboard</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { flex: 1, backgroundColor: '#16a34a' }]}
+                  onPress={shareVerificationWhatsApp}
+                >
+                  <Text style={styles.actionBtnText}>💬 Share on WhatsApp</Text>
+                </TouchableOpacity>
+              </View>
               <TouchableOpacity style={styles.pdfButton} onPress={downloadPdf}>
                 <Text style={styles.pdfButtonText}>📄 Court-Admissible Section 63 BSA PDF</Text>
               </TouchableOpacity>
@@ -549,11 +678,11 @@ export default function App() {
           <TouchableOpacity style={styles.bottomSheetCallBtn} onPress={dial1930}>
             <Text style={styles.bottomSheetCallText}>📞 Call 1930</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomSheetSecBtn} onPress={shareDossier}>
+          <TouchableOpacity style={styles.bottomSheetSecBtn} onPress={copyDossier}>
             <Text style={styles.bottomSheetSecText}>📋 Copy Complaint</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomSheetSecBtn} onPress={shareWarningWithFamily}>
-            <Text style={styles.bottomSheetSecText}>↗️ Share Alert</Text>
+          <TouchableOpacity style={[styles.bottomSheetSecBtn, { backgroundColor: '#15803d' }]} onPress={shareWarningWithFamily}>
+            <Text style={styles.bottomSheetSecText}>💬 WhatsApp Alert</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -569,8 +698,11 @@ export default function App() {
               </Text>
             </ScrollView>
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.shareButton} onPress={shareDossier}>
-                <Text style={styles.shareText}>Share / Copy</Text>
+              <TouchableOpacity style={[styles.shareButton, { backgroundColor: '#2563eb' }]} onPress={copyDossier}>
+                <Text style={styles.shareText}>📋 Copy to Clipboard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.shareButton, { backgroundColor: '#16a34a' }]} onPress={shareDossier}>
+                <Text style={styles.shareText}>💬 Share on WhatsApp</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.closeButton} onPress={() => setShowDossierModal(false)}>
                 <Text style={styles.closeText}>Close</Text>
@@ -745,6 +877,8 @@ const styles = StyleSheet.create({
   },
   accordionBodyText: { color: '#cbd5e1', fontSize: 12.5, lineHeight: 18 },
   monoText: { color: '#94a3b8', fontFamily: 'monospace', fontSize: 11, lineHeight: 16 },
+  actionBtn: { paddingVertical: 11, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  actionBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 13 },
   pdfButton: { backgroundColor: '#059669', padding: 12, borderRadius: 8, alignItems: 'center' },
   pdfButtonText: { color: '#fff', fontWeight: '700', fontSize: 13.5 },
   dossierButton: { backgroundColor: '#16233b', padding: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1e2e4a' },

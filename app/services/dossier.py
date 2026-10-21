@@ -46,8 +46,10 @@ def build_cybercrime_dossier(result: Dict[str, Any], raw_input: Optional[str] = 
     if result.get("vpa") and result["vpa"] != "N/A":
         suspect_vpas.append(result["vpa"])
 
-    suspect_urls = result.get("extracted_urls", [])
-    suspect_phones = result.get("extracted_contacts", [])
+    suspect_urls = []
+    if result.get("verdict") != "AUTHENTIC":
+        suspect_urls = result.get("unverified_urls", result.get("extracted_urls", []))
+    suspect_phones = result.get("extracted_contacts", []) if result.get("verdict") != "AUTHENTIC" else []
     fabricated_cnr = result.get("cnr_number")
 
     # Statutory sections
